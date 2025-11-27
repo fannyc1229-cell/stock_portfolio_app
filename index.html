@@ -1,301 +1,301 @@
-!DOCTYPE html
-html lang=zh-TW
-head
-    meta charset=UTF-8
-    meta name=viewport content=width=device-width, initial-scale=1.0
-    titleStockZen  個人資產管理title
-    script src=httpscdn.tailwindcss.comscript
-    script src=httpscdn.jsdelivr.netnpmchart.js@4.4.1distchart.umd.min.jsscript
-    style
-        @import url('httpsfonts.googleapis.comcss2family=Interwght@300;400;500;600;700&display=swap');
-        body { font-family 'Inter', sans-serif; background-color #f3ff6; }
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockZen | 個人資產管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3ff6; }
         
-         自定義滾動條 
-        -webkit-scrollbar { width 8px; height 8px; }
-        -webkit-scrollbar-track { background #f1f1f1; }
-        -webkit-scrollbar-thumb { background #c1c1c1; border-radius 4px; }
-        -webkit-scrollbar-thumbhover { background #a8a8a8; }
+        /* 自定義滾動條 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
-         Chart Container 
+        /* Chart Container */
         .chart-container {
-            position relative;
-            height 300px;
-            width 100%;
+            position: relative;
+            height: 300px;
+            width: 100%;
         }
 
-         隱藏數字輸入框的箭頭 
-        input-webkit-outer-spin-button,
-        input-webkit-inner-spin-button {
-            -webkit-appearance none;
-            margin 0;
+        /* 隱藏數字輸入框的箭頭 */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
         }
 
-         動畫 
-        .fade-in { animation fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn { from { opacity 0; transform translateY(10px); } to { opacity 1; transform translateY(0); } }
-    style
-    !-- Chosen Palette Slate (Sidebar) + White (Content) + RedGreen (Indicators) --
-    !-- Application Structure Plan Dashboard layout with Sidebar for navigation (desktop)  Bottom summary (mobile). 
+        /* 動畫 */
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <!-- Chosen Palette: Slate (Sidebar) + White (Content) + Red/Green (Indicators) -->
+    <!-- Application Structure Plan: Dashboard layout with Sidebar for navigation (desktop) / Bottom summary (mobile). 
          Central Dashboard shows Net Worth, Day Change (simulated), and Allocation.
          Holdings section allows CRUD operations. 
          Data fetching logic uses Google Search Grounding with manual override fallback. 
-         New AI analysis features are integrated into the dashboard (Portfolio Analysis) and the holdings list (Stock Summary) using dedicated modals. --
-    !-- Visualization & Content Choices 
-         - Net Worth Card Big number, key goal.
-         - Holdings Table Detailed list with Sparkline-like P&L indicators and new AI analysis trigger.
-         - Allocation Chart Pie Chart (Chart.js) to show diversification.
-         - Interaction Modals for adding assets, manual price entry, and AI analysis results. --
-    !-- CONFIRMATION NO SVG graphics used. NO Mermaid JS used. --
-head
-body class=text-gray-800 h-screen flex overflow-hidden
+         New AI analysis features are integrated into the dashboard (Portfolio Analysis) and the holdings list (Stock Summary) using dedicated modals. -->
+    <!-- Visualization & Content Choices: 
+         - Net Worth Card: Big number, key goal.
+         - Holdings Table: Detailed list with Sparkline-like P&L indicators and new AI analysis trigger.
+         - Allocation Chart: Pie Chart (Chart.js) to show diversification.
+         - Interaction: Modals for adding assets, manual price entry, and AI analysis results. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="text-gray-800 h-screen flex overflow-hidden">
 
-    !-- 桌面側邊欄  手機置底導航 (簡化為側邊欄模式) --
-    aside class=hidden mdflex mdflex-col w-64 bg-slate-900 text-white transition-all duration-300 z-10
-        div class=p-6 border-b border-slate-800 flex items-center justify-between
-            h1 class=text-2xl font-bold tracking-tightStockZenh1
-            span class=text-xs bg-slate-700 px-2 py-1 rounded text-slate-300v1.0span
-        div
-        nav class=flex-1 p-4 space-y-2 overflow-y-auto
-            a href=# class=flex items-center space-x-3 px-4 py-3 bg-slate-800 rounded-lg text-white shadow-sm
-                span class=text-xl📊span
-                span class=font-medium儀表板span
-            a
-            div class=mt-8 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider資產管理div
-            button onclick=openAddModal() class=w-full mt-2 flex items-center space-x-3 px-4 py-3 text-slate-400 hoverbg-slate-800 hovertext-white rounded-lg transition-colors text-left
-                span class=text-xl➕span
-                span class=font-medium新增持股span
-            button
-             button onclick=updateData() class=w-full mt-1 flex items-center space-x-3 px-4 py-3 text-slate-400 hoverbg-slate-800 hovertext-white rounded-lg transition-colors text-left
-                span class=text-xl🔄span
-                span class=font-medium更新報價span
-            button
-        nav
-        div class=p-4 border-t border-slate-800
-            div class=flex items-center space-x-3 px-4 py-2
-                div class=w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-boldUdiv
-                div
-                    p class=text-sm font-mediumUser Portfoliop
-                    p class=text-xs text-slate-400Local Storagep
-                div
-            div
-        div
-    aside
+    <!-- 桌面側邊欄 / 手機置底導航 (簡化為側邊欄模式) -->
+    <aside class="hidden md:flex md:flex-col w-64 bg-slate-900 text-white transition-all duration-300 z-10">
+        <div class="p-6 border-b border-slate-800 flex items-center justify-between">
+            <h1 class="text-2xl font-bold tracking-tight">StockZen</h1>
+            <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">v1.0</span>
+        </div>
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+            <a href="#" class="flex items-center space-x-3 px-4 py-3 bg-slate-800 rounded-lg text-white shadow-sm">
+                <span class="text-xl">📊</span>
+                <span class="font-medium">儀表板</span>
+            </a>
+            <div class="mt-8 px-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">資產管理</div>
+            <button onclick="openAddModal()" class="w-full mt-2 flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left">
+                <span class="text-xl">➕</span>
+                <span class="font-medium">新增持股</span>
+            </button>
+             <button onclick="updateData()" class="w-full mt-1 flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left">
+                <span class="text-xl">🔄</span>
+                <span class="font-medium">更新報價</span>
+            </button>
+        </nav>
+        <div class="p-4 border-t border-slate-800">
+            <div class="flex items-center space-x-3 px-4 py-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">U</div>
+                <div>
+                    <p class="text-sm font-medium">User Portfolio</p>
+                    <p class="text-xs text-slate-400">Local Storage</p>
+                </div>
+            </div>
+        </div>
+    </aside>
 
-    !-- 主內容區塊 --
-    div class=flex-1 flex flex-col h-screen overflow-hidden relative
+    <!-- 主內容區塊 -->
+    <div class="flex-1 flex flex-col h-screen overflow-hidden relative">
         
-        !-- 手機版頂部導航 --
-        header class=mdhidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md z-20
-            h1 class=text-xl font-boldStockZenh1
-            button onclick=openAddModal() class=text-2xl focusoutline-none➕button
-        header
+        <!-- 手機版頂部導航 -->
+        <header class="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md z-20">
+            <h1 class="text-xl font-bold">StockZen</h1>
+            <button onclick="openAddModal()" class="text-2xl focus:outline-none">➕</button>
+        </header>
 
-        !-- 滾動內容區域 --
-        main class=flex-1 overflow-y-auto p-4 mdp-8 relative
+        <!-- 滾動內容區域 -->
+        <main class="flex-1 overflow-y-auto p-4 md:p-8 relative">
             
-            !-- 頂部資訊卡片 --
-            div class=grid grid-cols-1 mdgrid-cols-3 gap-6 mb-8 fade-in
-                !-- 總資產 --
-                div class=bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between relative overflow-hidden
-                    div class=absolute right-0 top-0 p-4 opacity-5 text-6xl💰div
-                    div
-                        p class=text-sm font-medium text-gray-500 mb-1總資產淨值 (TWD)p
-                        h2 id=totalNetWorth class=text-3xl font-bold text-slate-900 tracking-tightNT$ 0h2
-                    div
-                    div class=mt-4 flex items-center text-sm
-                        span class=text-gray-400匯率參考 1 USD ≈ span id=exchangeRateDisplay32.5span TWDspan
-                    div
-                div
+            <!-- 頂部資訊卡片 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 fade-in">
+                <!-- 總資產 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between relative overflow-hidden">
+                    <div class="absolute right-0 top-0 p-4 opacity-5 text-6xl">💰</div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">總資產淨值 (TWD)</p>
+                        <h2 id="totalNetWorth" class="text-3xl font-bold text-slate-900 tracking-tight">NT$ 0</h2>
+                    </div>
+                    <div class="mt-4 flex items-center text-sm">
+                        <span class="text-gray-400">匯率參考: 1 USD ≈ <span id="exchangeRateDisplay">32.5</span> TWD</span>
+                    </div>
+                </div>
 
-                !-- 總損益 --
-                div class=bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between
-                    div
-                        p class=text-sm font-medium text-gray-500 mb-1未實現總損益p
-                        h2 id=totalPL class=text-3xl font-bold text-gray-900 tracking-tightNT$ 0h2
-                    div
-                    div class=mt-4
-                        span id=totalPLPercent class=inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800
+                <!-- 總損益 -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex flex-col justify-between">
+                    <div>
+                        <p class="text-sm font-medium text-gray-500 mb-1">未實現總損益</p>
+                        <h2 id="totalPL" class="text-3xl font-bold text-gray-900 tracking-tight">NT$ 0</h2>
+                    </div>
+                    <div class="mt-4">
+                        <span id="totalPLPercent" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                             0.00%
-                        span
-                    div
-                div
+                        </span>
+                    </div>
+                </div>
 
-                !-- 投資分佈 (圓餅圖) --
-                div class=bg-white rounded-xl shadow-sm p-4 border border-gray-100 mdrow-span-2 flex flex-col items-center justify-center
-                     h3 class=text-sm font-medium text-gray-500 w-full text-left mb-2資產配置h3
-                     div class=chart-container
-                        canvas id=allocationChartcanvas
-                     div
-                div
+                <!-- 投資分佈 (圓餅圖) -->
+                <div class="bg-white rounded-xl shadow-sm p-4 border border-gray-100 md:row-span-2 flex flex-col items-center justify-center">
+                     <h3 class="text-sm font-medium text-gray-500 w-full text-left mb-2">資產配置</h3>
+                     <div class="chart-container">
+                        <canvas id="allocationChart"></canvas>
+                     </div>
+                </div>
 
-                !-- 市場狀態  快速操作 (佔據剩餘空間) --
-                div class=bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white mdcol-span-2
-                    div class=flex justify-between items-start
-                        div
-                            h3 class=text-lg font-bold mb-2市場快訊h3
-                            p class=text-indigo-100 text-sm mb-4點擊「更新報價」以獲取 Google 搜尋到的最新價格。p
-                            p class=text-xs text-indigo-200 opacity-80 價格可能延遲，請以券商為準。p
-                        div
-                        div class=flex flex-col space-y-2
-                            button onclick=updateData() class=bg-white text-indigo-600 hoverbg-indigo-50 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors
+                <!-- 市場狀態 / 快速操作 (佔據剩餘空間) -->
+                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white md:col-span-2">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-lg font-bold mb-2">市場快訊</h3>
+                            <p class="text-indigo-100 text-sm mb-4">點擊「更新報價」以獲取 Google 搜尋到的最新價格。</p>
+                            <p class="text-xs text-indigo-200 opacity-80">* 價格可能延遲，請以券商為準。</p>
+                        </div>
+                        <div class="flex flex-col space-y-2">
+                            <button onclick="updateData()" class="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">
                                 立即更新
-                            button
-                            !-- New LLM Feature 1 Portfolio Analysis --
-                            button onclick=analyzePortfolio() class=bg-pink-500 text-white hoverbg-pink-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center space-x-1
+                            </button>
+                            <!-- New LLM Feature 1: Portfolio Analysis -->
+                            <button onclick="analyzePortfolio()" class="bg-pink-500 text-white hover:bg-pink-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center space-x-1">
                                 ✨ 組合分析
-                            button
-                        div
-                    div
-                div
-            div
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-            !-- 持股列表 --
-            div class=bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden fade-in style=animation-delay 0.1s;
-                div class=p-6 border-b border-gray-100 flex justify-between items-center
-                    h3 class=text-lg font-bold text-gray-800持股明細h3
-                    span class=text-xs text-gray-400點擊價格可手動修正span
-                div
-                div class=overflow-x-auto
-                    table class=w-full text-sm text-left
-                        thead class=text-xs text-gray-500 uppercase bg-gray-5050
-                            tr
-                                th class=px-6 py-4 font-medium標的th
-                                th class=px-6 py-4 font-medium text-right現價th
-                                th class=px-6 py-4 font-medium text-right均價(成本)th
-                                th class=px-6 py-4 font-medium text-right股數th
-                                th class=px-6 py-4 font-medium text-right市值 (TWD)th
-                                th class=px-6 py-4 font-medium text-right損益 (TWD)th
-                                th class=px-6 py-4 font-medium text-right損益 %th
-                                th class=px-6 py-4 font-medium text-center操作th
-                            tr
-                        thead
-                        tbody id=holdingsList class=divide-y divide-gray-100
-                            !-- JS 將填充此處 --
-                            tr
-                                td colspan=8 class=px-6 py-8 text-center text-gray-400
+            <!-- 持股列表 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden fade-in" style="animation-delay: 0.1s;">
+                <div class="p-6 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-800">持股明細</h3>
+                    <span class="text-xs text-gray-400">點擊價格可手動修正</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-500 uppercase bg-gray-50/50">
+                            <tr>
+                                <th class="px-6 py-4 font-medium">標的</th>
+                                <th class="px-6 py-4 font-medium text-right">現價</th>
+                                <th class="px-6 py-4 font-medium text-right">均價(成本)</th>
+                                <th class="px-6 py-4 font-medium text-right">股數</th>
+                                <th class="px-6 py-4 font-medium text-right">市值 (TWD)</th>
+                                <th class="px-6 py-4 font-medium text-right">損益 (TWD)</th>
+                                <th class="px-6 py-4 font-medium text-right">損益 %</th>
+                                <th class="px-6 py-4 font-medium text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="holdingsList" class="divide-y divide-gray-100">
+                            <!-- JS 將填充此處 -->
+                            <tr>
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-400">
                                     載入中或尚無持股...
-                                td
-                            tr
-                        tbody
-                    table
-                div
-            div
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             
-            div class=h-20div !-- 底部留白 --
-        main
-    div
+            <div class="h-20"></div> <!-- 底部留白 -->
+        </main>
+    </div>
 
-    !-- 模態框 新增持股 --
-    div id=addModal class=fixed inset-0 bg-gray-90050 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity
-        div class=bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 m-4
-            div class=flex justify-between items-center mb-6
-                h3 class=text-xl font-bold text-gray-800新增編輯 持股h3
-                button onclick=closeAddModal() class=text-gray-400 hovertext-gray-600 text-2xl&times;button
-            div
-            form id=assetForm onsubmit=handleAssetSubmit(event) class=space-y-4
-                div
-                    label class=block text-sm font-medium text-gray-700 mb-1股票代號label
-                    input type=text id=inputSymbol placeholder=例如 2330, AAPL, TSLA class=w-full px-4 py-2 border border-gray-300 rounded-lg focusring-2 focusring-indigo-500 focusborder-indigo-500 outline-none uppercase required
-                div
-                div class=grid grid-cols-2 gap-4
-                    div
-                        label class=block text-sm font-medium text-gray-700 mb-1市場label
-                        select id=inputMarket onchange=updateCurrencyHint() class=w-full px-4 py-2 border border-gray-300 rounded-lg focusring-2 focusring-indigo-500 outline-none
-                            option value=台股台股 (TW)option
-                            option value=美股美股 (US)option
-                        select
-                    div
-                    div
-                        label class=block text-sm font-medium text-gray-700 mb-1持有股數label
-                        input type=number id=inputShares step=any class=w-full px-4 py-2 border border-gray-300 rounded-lg focusring-2 focusring-indigo-500 outline-none required
-                    div
-                div
-                div
-                    label class=block text-sm font-medium text-gray-700 mb-1平均成本 (單價)label
-                    div class=relative
-                        input type=number id=inputCost step=any class=w-full px-4 py-2 border border-gray-300 rounded-lg focusring-2 focusring-indigo-500 outline-none required
-                        span id=currencyHint class=absolute right-3 top-2 text-gray-400 text-smTWDspan
-                    div
-                div
-                button type=submit class=w-full bg-indigo-600 hoverbg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all transform hover-translate-y-0.5 mt-4
+    <!-- 模態框: 新增持股 -->
+    <div id="addModal" class="fixed inset-0 bg-gray-900/50 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all scale-100 m-4">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">新增/編輯 持股</h3>
+                <button onclick="closeAddModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <form id="assetForm" onsubmit="handleAssetSubmit(event)" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">股票代號</label>
+                    <input type="text" id="inputSymbol" placeholder="例如: 2330, AAPL, TSLA" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none uppercase" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">市場</label>
+                        <select id="inputMarket" onchange="updateCurrencyHint()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                            <option value="台股">台股 (TW)</option>
+                            <option value="美股">美股 (US)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">持有股數</label>
+                        <input type="number" id="inputShares" step="any" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">平均成本 (單價)</label>
+                    <div class="relative">
+                        <input type="number" id="inputCost" step="any" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required>
+                        <span id="currencyHint" class="absolute right-3 top-2 text-gray-400 text-sm">TWD</span>
+                    </div>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-200 transition-all transform hover:-translate-y-0.5 mt-4">
                     儲存持股
-                button
-            form
-        div
-    div
+                </button>
+            </form>
+        </div>
+    </div>
 
-    !-- 模態框 手動價格輸入 --
-    div id=priceModal class=fixed inset-0 bg-gray-90050 hidden items-center justify-center z-50 backdrop-blur-sm
-        div class=bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4
-            h3 class=text-lg font-bold text-gray-800 mb-2手動修正價格h3
-            p id=priceModalSymbol class=text-sm text-gray-500 mb-4Targetp
-            input type=number id=manualPriceInput step=any class=w-full px-4 py-2 border border-gray-300 rounded-lg focusring-2 focusring-pink-500 outline-none text-lg font-medium mb-4 placeholder=輸入最新市價
-            div class=flex justify-end space-x-3
-                button onclick=closePriceModal() class=px-4 py-2 text-gray-600 hoverbg-gray-100 rounded-lg取消button
-                button id=savePriceBtn class=px-4 py-2 bg-pink-500 text-white rounded-lg hoverbg-pink-600 shadow-md更新button
-            div
-        div
-    div
+    <!-- 模態框: 手動價格輸入 -->
+    <div id="priceModal" class="fixed inset-0 bg-gray-900/50 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">手動修正價格</h3>
+            <p id="priceModalSymbol" class="text-sm text-gray-500 mb-4">Target</p>
+            <input type="number" id="manualPriceInput" step="any" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none text-lg font-medium mb-4" placeholder="輸入最新市價">
+            <div class="flex justify-end space-x-3">
+                <button onclick="closePriceModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+                <button id="savePriceBtn" class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 shadow-md">更新</button>
+            </div>
+        </div>
+    </div>
     
-    !-- 模態框 刪除確認 (Custom Modal) --
-    div id=deleteConfirmModal class=fixed inset-0 bg-gray-90050 hidden items-center justify-center z-50 backdrop-blur-sm
-        div class=bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4
-            h3 class=text-lg font-bold text-gray-800 mb-2確認刪除h3
-            p id=deleteModalMessage class=text-sm text-gray-500 mb-4確定要刪除此持股紀錄嗎？此操作無法復原。p
-            div class=flex justify-end space-x-3
-                button onclick=closeDeleteConfirmModal() class=px-4 py-2 text-gray-600 hoverbg-gray-100 rounded-lg取消button
-                button id=confirmDeleteBtn class=px-4 py-2 bg-red-600 text-white rounded-lg hoverbg-red-700 shadow-md確定刪除button
-            div
-        div
-    div
+    <!-- 模態框: 刪除確認 (Custom Modal) -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-gray-900/50 hidden items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 m-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-2">確認刪除</h3>
+            <p id="deleteModalMessage" class="text-sm text-gray-500 mb-4">確定要刪除此持股紀錄嗎？此操作無法復原。</p>
+            <div class="flex justify-end space-x-3">
+                <button onclick="closeDeleteConfirmModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
+                <button id="confirmDeleteBtn" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 shadow-md">確定刪除</button>
+            </div>
+        </div>
+    </div>
 
-    !-- 模態框 Gemini LLM 分析結果 --
-    div id=analysisModal class=fixed inset-0 bg-gray-90050 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity
-        div class=bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 transform transition-all scale-100 m-4
-            div class=flex justify-between items-center mb-6 border-b pb-3
-                h3 id=analysisModalTitle class=text-xl font-bold text-gray-800分析報告h3
-                button onclick=closeAnalysisModal() class=text-gray-400 hovertext-gray-600 text-2xl&times;button
-            div
-            div id=analysisModalContent class=text-gray-700 leading-relaxed max-h-96 overflow-y-auto
-                div class=flex justify-center items-center py-10
-                    div class=w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spindiv
-                    p class=ml-3 text-indigo-600AI 正在努力分析中...p
-                div
-            div
-             div id=analysisModalSources class=text-xs text-gray-500 mt-4 pt-4 border-t border-gray-100 hidden
-                p class=font-semibold mb-1參考資訊來源p
-                ul id=sourceList class=space-y-1 list-disc pl-5ul
-            div
-            div class=flex justify-end mt-6
-                button onclick=closeAnalysisModal() class=bg-indigo-600 hoverbg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-colors關閉button
-            div
-        div
-    div
+    <!-- 模態框: Gemini LLM 分析結果 -->
+    <div id="analysisModal" class="fixed inset-0 bg-gray-900/50 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 transform transition-all scale-100 m-4">
+            <div class="flex justify-between items-center mb-6 border-b pb-3">
+                <h3 id="analysisModalTitle" class="text-xl font-bold text-gray-800">分析報告</h3>
+                <button onclick="closeAnalysisModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <div id="analysisModalContent" class="text-gray-700 leading-relaxed max-h-96 overflow-y-auto">
+                <div class="flex justify-center items-center py-10">
+                    <div class="w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spin"></div>
+                    <p class="ml-3 text-indigo-600">AI 正在努力分析中...</p>
+                </div>
+            </div>
+             <div id="analysisModalSources" class="text-xs text-gray-500 mt-4 pt-4 border-t border-gray-100 hidden">
+                <p class="font-semibold mb-1">參考資訊來源:</p>
+                <ul id="sourceList" class="space-y-1 list-disc pl-5"></ul>
+            </div>
+            <div class="flex justify-end mt-6">
+                <button onclick="closeAnalysisModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-colors">關閉</button>
+            </div>
+        </div>
+    </div>
 
-    !-- Toast 訊息 --
-    div id=toast class=fixed top-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-x-full transition-transform duration-300 z-50 flex items-center
-        span id=toastMsgMessagespan
-    div
+    <!-- Toast 訊息 -->
+    <div id="toast" class="fixed top-5 right-5 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-xl transform translate-x-full transition-transform duration-300 z-50 flex items-center">
+        <span id="toastMsg">Message</span>
+    </div>
 
-    script
-         ==========================================
-         核心狀態與數據
-         ==========================================
+    <script>
+        // ==========================================
+        // 核心狀態與數據
+        // ==========================================
         const APP_STATE = {
-            exchangeRate 32.5,  預設匯率，可嘗試抓取更新
-            prices {},  { 2330 { price 1000, source 'API''Manual' } }
-            portfolio [],
-            chartInstance null
+            exchangeRate: 32.5, // 預設匯率，可嘗試抓取更新
+            prices: {}, // { "2330": { price: 1000, source: 'API'/'Manual' } }
+            portfolio: [],
+            chartInstance: null
         };
 
-         ==========================================
-         初始化與生命週期
-         ==========================================
-        document.addEventListener('DOMContentLoaded', () = {
+        // ==========================================
+        // 初始化與生命週期
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
             loadData();
             render();
-             延遲自動更新一次數據
-            setTimeout(() = updateData(true), 1000);
+            // 延遲自動更新一次數據
+            setTimeout(() => updateData(true), 1000);
         });
 
         function loadData() {
@@ -303,10 +303,10 @@ body class=text-gray-800 h-screen flex overflow-hidden
             if (saved) {
                 APP_STATE.portfolio = JSON.parse(saved);
             } else {
-                 預設範例數據
+                // 預設範例數據
                 APP_STATE.portfolio = [
-                    { symbol 2330, market 台股, shares 1000, cost 600 },
-                    { symbol AAPL, market 美股, shares 50, cost 150 }
+                    { symbol: "2330", market: "台股", shares: 1000, cost: 600 },
+                    { symbol: "AAPL", market: "美股", shares: 50, cost: 150 }
                 ];
             }
             
@@ -319,16 +319,16 @@ body class=text-gray-800 h-screen flex overflow-hidden
             localStorage.setItem('stockZen_prices', JSON.stringify(APP_STATE.prices));
         }
 
-         ==========================================
-         通用 API 與 LLM 呼叫工具
-         ==========================================
+        // ==========================================
+        // 通用 API 與 LLM 呼叫工具
+        // ==========================================
 
         async function fetchWithBackoff(url, options, maxRetries = 2) {
-            for (let i = 0; i  maxRetries; i++) {
+            for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(url, options);
                     if (response.status === 429) {
-                        await new Promise(r = setTimeout(r, 1000  Math.pow(2, i)));
+                        await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
                         continue;
                     }
                     return await response.json();
@@ -339,133 +339,133 @@ body class=text-gray-800 h-screen flex overflow-hidden
         }
 
         async function callGemini(prompt, isGrounded = false, systemInstruction = null) {
-            const apiKey = ; 
-            const apiUrl = `httpsgenerativelanguage.googleapis.comv1betamodelsgemini-2.5-flash-preview-09-2025generateContentkey=${apiKey}`;
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
             const payload = {
-                contents [{ parts [{ text prompt }] }],
+                contents: [{ parts: [{ text: prompt }] }],
             };
             
             if (isGrounded) {
-                payload.tools = [{ google_search {} }];
+                payload.tools = [{ "google_search": {} }];
             }
             
             if (systemInstruction) {
-                payload.systemInstruction = { parts [{ text systemInstruction }] };
+                payload.systemInstruction = { parts: [{ text: systemInstruction }] };
             }
 
             try {
                 const data = await fetchWithBackoff(apiUrl, {
-                    method 'POST',
-                    headers { 'Content-Type' 'applicationjson' },
-                    body JSON.stringify(payload)
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
 
-                const candidate = data.candidates.[0];
+                const candidate = data.candidates?.[0];
                 
-                if (candidate && candidate.content.parts.[0].text) {
+                if (candidate && candidate.content?.parts?.[0]?.text) {
                     const text = candidate.content.parts[0].text;
                     let sources = [];
 
-                     Extract grounding sources if used
+                    // Extract grounding sources if used
                     const groundingMetadata = candidate.groundingMetadata;
                     if (groundingMetadata && groundingMetadata.groundingAttributions) {
                         sources = groundingMetadata.groundingAttributions
-                            .map(attribution = ({
-                                uri attribution.web.uri,
-                                title attribution.web.title,
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
                             }))
-                            .filter(source = source.uri && source.title);
+                            .filter(source => source.uri && source.title);
                     }
                     return { text, sources };
                 }
-                return { text 未能生成分析結果。請稍後再試。, sources [] };
+                return { text: "未能生成分析結果。請稍後再試。", sources: [] };
 
             } catch (e) {
-                console.error(Gemini API Error, e);
-                return { text 連線錯誤，無法取得 AI 分析。, sources [] };
+                console.error("Gemini API Error:", e);
+                return { text: "連線錯誤，無法取得 AI 分析。", sources: [] };
             }
         }
 
 
-         ==========================================
-         數據獲取 (Google Search Grounding - Price)
-         ==========================================
+        // ==========================================
+        // 數據獲取 (Google Search Grounding - Price)
+        // ==========================================
         async function updateData(silent = false) {
-            if (!silent) showToast(正在搜尋最新報價..., info);
+            if (!silent) showToast("正在搜尋最新報價...", "info");
 
-            const apiKey = ; 
-            const apiUrl = `httpsgenerativelanguage.googleapis.comv1betamodelsgemini-2.5-flash-preview-09-2025generateContentkey=${apiKey}`;
+            const apiKey = ""; 
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
 
-            const targets = APP_STATE.portfolio.filter(item = {
+            const targets = APP_STATE.portfolio.filter(item => {
                 const current = APP_STATE.prices[item.symbol];
-                return !current  current.source !== 'Manual';
+                return !current || current.source !== 'Manual';
             });
 
             if (targets.length === 0 && !silent) {
-                showToast(所有標的皆為手動鎖定價格, info);
+                showToast("所有標的皆為手動鎖定價格", "info");
                 render();
                 return;
             }
 
             for (const item of targets) {
                 const prompt = item.market === '台股' 
-                     `Current stock price for Taiwan Stock ${item.symbol}. Return ONLY the numeric price in TWD.` 
-                     `Current stock price for US Stock ${item.symbol}. Return ONLY the numeric price in USD.`;
+                    ? `Current stock price for Taiwan Stock ${item.symbol}. Return ONLY the numeric price in TWD.` 
+                    : `Current stock price for US Stock ${item.symbol}. Return ONLY the numeric price in USD.`;
 
                 const payload = {
-                    contents [{ parts [{ text prompt }] }],
-                    tools [{ google_search {} }],
-                    systemInstruction { parts [{ text You are a price fetcher. Return only the latest raw number. No currency symbols. }] }
+                    contents: [{ parts: [{ text: prompt }] }],
+                    tools: [{ "google_search": {} }],
+                    systemInstruction: { parts: [{ text: "You are a price fetcher. Return only the latest raw number. No currency symbols." }] }
                 };
 
                 try {
                     const data = await fetchWithBackoff(apiUrl, {
-                        method 'POST',
-                        headers { 'Content-Type' 'applicationjson' },
-                        body JSON.stringify(payload)
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
                     });
 
-                    const text = data.candidates.[0].content.parts.[0].text;
-                     Robust extraction of floating point number
-                    const priceMatch = text.match([d.]+);
-                    const price = priceMatch  parseFloat(priceMatch[0])  NaN;
+                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    // Robust extraction of floating point number
+                    const priceMatch = text?.match(/[\d\.]+/);
+                    const price = priceMatch ? parseFloat(priceMatch[0]) : NaN;
 
-                    if (price && !isNaN(price) && price  0) {
-                        APP_STATE.prices[item.symbol] = { price price, source 'API' };
+                    if (price && !isNaN(price) && price > 0) {
+                        APP_STATE.prices[item.symbol] = { price: price, source: 'API' };
                     }
                 } catch (e) {
                     console.error(`Error fetching ${item.symbol}`, e);
                 }
-                await new Promise(r = setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 500));
             }
 
             saveData();
             render();
-            if (!silent) showToast(報價更新完成, success);
+            if (!silent) showToast("報價更新完成", "success");
         }
 
-         ==========================================
-         渲染邏輯
-         ==========================================
+        // ==========================================
+        // 渲染邏輯
+        // ==========================================
         function render() {
             const tbody = document.getElementById('holdingsList');
             tbody.innerHTML = '';
             
             let totalNetWorth = 0;
             let totalCost = 0;
-            const allocationData = { labels [], data [], colors [] };
+            const allocationData = { labels: [], data: [], colors: [] };
             const bgColors = ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#8b5cf6'];
 
             if (APP_STATE.portfolio.length === 0) {
-                tbody.innerHTML = `trtd colspan=8 class=px-6 py-8 text-center text-gray-400點擊左側「新增持股」開始管理您的財富tdtr`;
+                tbody.innerHTML = `<tr><td colspan="8" class="px-6 py-8 text-center text-gray-400">點擊左側「新增持股」開始管理您的財富</td></tr>`;
             }
 
-            APP_STATE.portfolio.forEach((item, index) = {
-                const priceData = APP_STATE.prices[item.symbol]  { price 0, source 'None' };
+            APP_STATE.portfolio.forEach((item, index) => {
+                const priceData = APP_STATE.prices[item.symbol] || { price: 0, source: 'None' };
                 const currentPrice = priceData.price;
                 
-                 計算 (統一換算成 TWD)
+                // 計算 (統一換算成 TWD)
                 let marketValueTWD = 0;
                 let costTWD = 0;
                 let profitTWD = 0;
@@ -474,70 +474,70 @@ body class=text-gray-800 h-screen flex overflow-hidden
                 let displayCost = item.cost;
 
                 if (item.market === '美股') {
-                    marketValueTWD = currentPrice  item.shares  APP_STATE.exchangeRate;
-                    costTWD = item.cost  item.shares  APP_STATE.exchangeRate;
+                    marketValueTWD = currentPrice * item.shares * APP_STATE.exchangeRate;
+                    costTWD = item.cost * item.shares * APP_STATE.exchangeRate;
                     displayPrice = `US$ ${currentPrice.toFixed(2)}`;
                     displayCost = `US$ ${item.cost.toFixed(2)}`;
                 } else {
-                    marketValueTWD = currentPrice  item.shares;
-                    costTWD = item.cost  item.shares;
+                    marketValueTWD = currentPrice * item.shares;
+                    costTWD = item.cost * item.shares;
                     displayPrice = `NT$ ${currentPrice.toFixed(2)}`;
                     displayCost = `NT$ ${item.cost.toFixed(2)}`;
                 }
 
-                if (costTWD  0) {  Avoid division by zero
+                if (costTWD > 0) { // Avoid division by zero
                     profitTWD = marketValueTWD - costTWD;
-                    profitPercent = (profitTWD  costTWD)  100;
-                } else if (marketValueTWD  0) {
+                    profitPercent = (profitTWD / costTWD) * 100;
+                } else if (marketValueTWD > 0) {
                     profitTWD = marketValueTWD;
-                    profitPercent = 100;  Infinite P&L is represented as 100% or simply ignored for safety
+                    profitPercent = 100; // Infinite P&L is represented as 100% or simply ignored for safety
                 }
 
                 totalNetWorth += marketValueTWD;
                 totalCost += costTWD;
 
-                 Chart Data
+                // Chart Data
                 allocationData.labels.push(item.symbol);
                 allocationData.data.push(marketValueTWD);
                 allocationData.colors.push(bgColors[index % bgColors.length]);
 
-                 Render Row
+                // Render Row
                 const tr = document.createElement('tr');
-                tr.className = hoverbg-gray-50 transition-colors border-b border-gray-50 lastborder-0;
+                tr.className = "hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0";
                 
-                 紅漲綠跌樣式
-                const colorClass = profitTWD = 0  'text-red-500'  'text-green-600';
-                const sign = profitTWD = 0  '+'  '';
-                const sourceBadge = priceData.source === 'Manual'  'span class=text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1手動span'  '';
+                // 紅漲綠跌樣式
+                const colorClass = profitTWD >= 0 ? 'text-red-500' : 'text-green-600';
+                const sign = profitTWD >= 0 ? '+' : '';
+                const sourceBadge = priceData.source === 'Manual' ? '<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">手動</span>' : '';
 
                 tr.innerHTML = `
-                    td class=px-6 py-4 font-bold text-gray-800 flex items-center
+                    <td class="px-6 py-4 font-bold text-gray-800 flex items-center">
                         ${item.symbol} 
-                        span class=ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded${item.market}span
-                    td
-                    td class=px-6 py-4 text-right cursor-pointer hovertext-indigo-600 transition-colors onclick=openPriceModal('${item.symbol}')
-                        div class=font-medium${displayPrice}div
-                        div class=text-xs text-gray-400 flex justify-end items-center${sourceBadge}div
-                    td
-                    td class=px-6 py-4 text-right text-gray-500${displayCost}td
-                    td class=px-6 py-4 text-right text-gray-600${item.shares.toLocaleString()}td
-                    td class=px-6 py-4 text-right font-medium text-gray-800${Math.round(marketValueTWD).toLocaleString()}td
-                    td class=px-6 py-4 text-right ${colorClass} font-medium${sign}${Math.round(profitTWD).toLocaleString()}td
-                    td class=px-6 py-4 text-right ${colorClass} font-medium${sign}${profitPercent.toFixed(2)}%td
-                    td class=px-6 py-4 text-center space-x-2
-                        !-- New LLM Feature 2 Stock Analysis --
-                        button onclick=openStockAnalysisModal('${item.symbol}') class=text-xs text-indigo-500 hovertext-indigo-700 transition-colors font-medium p-1✨ 分析button
-                        button onclick=openDeleteConfirmModal(${index}) class=text-gray-300 hovertext-red-500 transition-colors p-1🗑️button
-                    td
+                        <span class="ml-2 text-xs font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">${item.market}</span>
+                    </td>
+                    <td class="px-6 py-4 text-right cursor-pointer hover:text-indigo-600 transition-colors" onclick="openPriceModal('${item.symbol}')">
+                        <div class="font-medium">${displayPrice}</div>
+                        <div class="text-xs text-gray-400 flex justify-end items-center">${sourceBadge}</div>
+                    </td>
+                    <td class="px-6 py-4 text-right text-gray-500">${displayCost}</td>
+                    <td class="px-6 py-4 text-right text-gray-600">${item.shares.toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right font-medium text-gray-800">${Math.round(marketValueTWD).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right ${colorClass} font-medium">${sign}${Math.round(profitTWD).toLocaleString()}</td>
+                    <td class="px-6 py-4 text-right ${colorClass} font-medium">${sign}${profitPercent.toFixed(2)}%</td>
+                    <td class="px-6 py-4 text-center space-x-2">
+                        <!-- New LLM Feature 2: Stock Analysis -->
+                        <button onclick="openStockAnalysisModal('${item.symbol}')" class="text-xs text-indigo-500 hover:text-indigo-700 transition-colors font-medium p-1">✨ 分析</button>
+                        <button onclick="openDeleteConfirmModal(${index})" class="text-gray-300 hover:text-red-500 transition-colors p-1">🗑️</button>
+                    </td>
                 `;
                 tbody.appendChild(tr);
             });
 
-             更新總覽卡片
+            // 更新總覽卡片
             const totalPL = totalNetWorth - totalCost;
-            const totalPLPercent = totalCost  0  (totalPL  totalCost)  100  0;
-            const totalColor = totalPL = 0  'text-red-500'  'text-green-600';
-            const totalSign = totalPL = 0  '+'  '';
+            const totalPLPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
+            const totalColor = totalPL >= 0 ? 'text-red-500' : 'text-green-600';
+            const totalSign = totalPL >= 0 ? '+' : '';
 
             document.getElementById('totalNetWorth').innerText = `NT$ ${Math.round(totalNetWorth).toLocaleString()}`;
             document.getElementById('totalPL').innerText = `NT$ ${Math.round(totalPL).toLocaleString()}`;
@@ -545,9 +545,9 @@ body class=text-gray-800 h-screen flex overflow-hidden
             
             const plBadge = document.getElementById('totalPLPercent');
             plBadge.innerText = `${totalSign}${totalPLPercent.toFixed(2)}%`;
-            plBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${totalPL = 0  'bg-red-50 text-red-600'  'bg-green-50 text-green-600'}`;
+            plBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${totalPL >= 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
 
-             繪製更新圖表
+            // 繪製/更新圖表
             renderChart(allocationData);
         }
 
@@ -561,25 +561,25 @@ body class=text-gray-800 h-screen flex overflow-hidden
             if (data.data.length === 0) return;
 
             APP_STATE.chartInstance = new Chart(ctx, {
-                type 'doughnut',
-                data {
-                    labels data.labels,
-                    datasets [{
-                        data data.data,
-                        backgroundColor data.colors,
-                        borderWidth 0,
-                        hoverOffset 10
+                type: 'doughnut',
+                data: {
+                    labels: data.labels,
+                    datasets: [{
+                        data: data.data,
+                        backgroundColor: data.colors,
+                        borderWidth: 0,
+                        hoverOffset: 10
                     }]
                 },
-                options {
-                    responsive true,
-                    maintainAspectRatio false,
-                    cutout '70%',
-                    plugins {
-                        legend { position 'bottom', labels { boxWidth 10, usePointStyle true, font { size 10 } } },
-                        tooltip { 
-                            callbacks { 
-                                label (ctx) = ` ${ctx.label} NT$${Math.round(ctx.raw).toLocaleString()}` 
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, font: { size: 10 } } },
+                        tooltip: { 
+                            callbacks: { 
+                                label: (ctx) => ` ${ctx.label}: NT$${Math.round(ctx.raw).toLocaleString()}` 
                             } 
                         }
                     }
@@ -587,9 +587,9 @@ body class=text-gray-800 h-screen flex overflow-hidden
             });
         }
 
-         ==========================================
-         互動功能
-         ==========================================
+        // ==========================================
+        // 互動功能
+        // ==========================================
         function openAddModal() {
             document.getElementById('addModal').classList.remove('hidden');
             document.getElementById('addModal').classList.add('flex');
@@ -604,7 +604,7 @@ body class=text-gray-800 h-screen flex overflow-hidden
 
         function updateCurrencyHint() {
             const market = document.getElementById('inputMarket').value;
-            document.getElementById('currencyHint').innerText = market === '台股'  'TWD'  'USD';
+            document.getElementById('currencyHint').innerText = market === '台股' ? 'TWD' : 'USD';
         }
 
         function handleAssetSubmit(e) {
@@ -616,44 +616,44 @@ body class=text-gray-800 h-screen flex overflow-hidden
 
             const newItem = { symbol, market, shares, cost };
             
-             簡單檢查是否已存在，若存在則覆蓋 (簡單邏輯)
-            const idx = APP_STATE.portfolio.findIndex(i = i.symbol === symbol);
-            if (idx = 0) {
+            // 簡單檢查是否已存在，若存在則覆蓋 (簡單邏輯)
+            const idx = APP_STATE.portfolio.findIndex(i => i.symbol === symbol);
+            if (idx >= 0) {
                 APP_STATE.portfolio[idx] = newItem;
-                showToast(`已更新 ${symbol}`, success);
+                showToast(`已更新 ${symbol}`, "success");
             } else {
                 APP_STATE.portfolio.push(newItem);
-                showToast(`已新增 ${symbol}`, success);
+                showToast(`已新增 ${symbol}`, "success");
             }
 
             saveData();
             render();
             closeAddModal();
-            updateData(true);  嘗試抓取新股票價格
+            updateData(true); // 嘗試抓取新股票價格
         }
         
-         刪除持股的執行函數 (取代舊的 deleteAsset)
+        // 刪除持股的執行函數 (取代舊的 deleteAsset)
         function executeDeleteAsset(index) {
             const removed = APP_STATE.portfolio.splice(index, 1);
             delete APP_STATE.prices[removed[0].symbol];
             saveData();
             render();
-            showToast(已刪除持股, info);
+            showToast("已刪除持股", "info");
             closeDeleteConfirmModal();
         }
 
-         刪除持股的確認模態框
+        // 刪除持股的確認模態框
         let assetIndexToDelete = null;
 
         function openDeleteConfirmModal(index) {
             assetIndexToDelete = index;
             const symbol = APP_STATE.portfolio[index].symbol;
-            document.getElementById('deleteModalMessage').innerHTML = `確定要刪除 span class=font-bold text-red-600${symbol}span 的持股紀錄嗎？此操作無法復原。`;
+            document.getElementById('deleteModalMessage').innerHTML = `確定要刪除 <span class="font-bold text-red-600">${symbol}</span> 的持股紀錄嗎？此操作無法復原。`;
             
             document.getElementById('deleteConfirmModal').classList.remove('hidden');
             document.getElementById('deleteConfirmModal').classList.add('flex');
 
-            document.getElementById('confirmDeleteBtn').onclick = () = {
+            document.getElementById('confirmDeleteBtn').onclick = () => {
                 executeDeleteAsset(assetIndexToDelete);
             };
         }
@@ -664,27 +664,27 @@ body class=text-gray-800 h-screen flex overflow-hidden
             assetIndexToDelete = null;
         }
 
-         手動價格修正
+        // 手動價格修正
         let currentEditingSymbol = null;
 
         function openPriceModal(symbol) {
             currentEditingSymbol = symbol;
             document.getElementById('priceModalSymbol').innerText = `正在修正 ${symbol} 的價格`;
-            const current = APP_STATE.prices[symbol].price  '';
+            const current = APP_STATE.prices[symbol]?.price || '';
             document.getElementById('manualPriceInput').value = current;
             
             document.getElementById('priceModal').classList.remove('hidden');
             document.getElementById('priceModal').classList.add('flex');
             
-             綁定更新按鈕
-            document.getElementById('savePriceBtn').onclick = () = {
+            // 綁定更新按鈕
+            document.getElementById('savePriceBtn').onclick = () => {
                 const newPrice = parseFloat(document.getElementById('manualPriceInput').value);
-                if (newPrice  0) {
-                    APP_STATE.prices[currentEditingSymbol] = { price newPrice, source 'Manual' };
+                if (newPrice > 0) {
+                    APP_STATE.prices[currentEditingSymbol] = { price: newPrice, source: 'Manual' };
                     saveData();
                     render();
                     closePriceModal();
-                    showToast(價格已鎖定, success);
+                    showToast("價格已鎖定", "success");
                 }
             };
         }
@@ -695,23 +695,23 @@ body class=text-gray-800 h-screen flex overflow-hidden
             currentEditingSymbol = null;
         }
 
-         Toast
+        // Toast
         function showToast(msg, type = 'info') {
             const toast = document.getElementById('toast');
             toast.classList.remove('translate-x-full');
             
-            const colors = { success 'bg-green-600', info 'bg-gray-800', error 'bg-red-600' };
-            toast.className = `fixed top-5 right-5 text-white px-6 py-3 rounded-lg shadow-xl transform transition-transform duration-300 z-50 flex items-center ${colors[type]  colors.info}`;
+            const colors = { success: 'bg-green-600', info: 'bg-gray-800', error: 'bg-red-600' };
+            toast.className = `fixed top-5 right-5 text-white px-6 py-3 rounded-lg shadow-xl transform transition-transform duration-300 z-50 flex items-center ${colors[type] || colors.info}`;
             document.getElementById('toastMsg').innerText = msg;
 
-            setTimeout(() = {
+            setTimeout(() => {
                 toast.classList.add('translate-x-full');
             }, 3000);
         }
 
-         ==========================================
-         Gemini LLM 分析功能
-         ==========================================
+        // ==========================================
+        // Gemini LLM 分析功能
+        // ==========================================
 
         function openAnalysisModal(title, content, sources = []) {
             document.getElementById('analysisModalTitle').innerText = title;
@@ -721,11 +721,11 @@ body class=text-gray-800 h-screen flex overflow-hidden
             const sourceList = document.getElementById('sourceList');
             sourceList.innerHTML = '';
 
-            if (sources.length  0) {
+            if (sources.length > 0) {
                 sourceContainer.classList.remove('hidden');
-                sources.forEach(s = {
+                sources.forEach(s => {
                     const li = document.createElement('li');
-                    li.innerHTML = `a href=${s.uri} target=_blank class=text-indigo-500 hoverunderline${s.title}a`;
+                    li.innerHTML = `<a href="${s.uri}" target="_blank" class="text-indigo-500 hover:underline">${s.title}</a>`;
                     sourceList.appendChild(li);
                 });
             } else {
@@ -741,32 +741,32 @@ body class=text-gray-800 h-screen flex overflow-hidden
             document.getElementById('analysisModal').classList.remove('flex');
         }
 
-         FEATURE 1 Portfolio Diversification Analysis
+        // FEATURE 1: Portfolio Diversification Analysis
         async function analyzePortfolio() {
-            openAnalysisModal(✨ 組合多元化分析, `
-                div class=flex justify-center items-center py-10
-                    div class=w-6 h-6 border-4 border-pink-400 border-t-transparent border-solid rounded-full animate-spindiv
-                    p class=ml-3 text-pink-600AI 正在評估您的投資組合結構...p
-                div
+            openAnalysisModal("✨ 組合多元化分析", `
+                <div class="flex justify-center items-center py-10">
+                    <div class="w-6 h-6 border-4 border-pink-400 border-t-transparent border-solid rounded-full animate-spin"></div>
+                    <p class="ml-3 text-pink-600">AI 正在評估您的投資組合結構...</p>
+                </div>
             `);
 
             if (APP_STATE.portfolio.length === 0) {
-                openAnalysisModal(✨ 組合多元化分析, p請先新增持股，AI 才能為您分析組合結構。p);
+                openAnalysisModal("✨ 組合多元化分析", "<p>請先新增持股，AI 才能為您分析組合結構。</p>");
                 return;
             }
 
-             Prepare structured portfolio data for the LLM
-            const structuredPortfolio = APP_STATE.portfolio.map(item = {
-                const price = APP_STATE.prices[item.symbol].price  0;
-                const valueTWD = item.market === '美股'  price  item.shares  APP_STATE.exchangeRate  price  item.shares;
-                const costTWD = item.market === '美股'  item.cost  item.shares  APP_STATE.exchangeRate  item.cost  item.shares;
-                const plPercent = costTWD  0  ((valueTWD - costTWD)  costTWD)  100  0;
+            // Prepare structured portfolio data for the LLM
+            const structuredPortfolio = APP_STATE.portfolio.map(item => {
+                const price = APP_STATE.prices[item.symbol]?.price || 0;
+                const valueTWD = item.market === '美股' ? price * item.shares * APP_STATE.exchangeRate : price * item.shares;
+                const costTWD = item.market === '美股' ? item.cost * item.shares * APP_STATE.exchangeRate : item.cost * item.shares;
+                const plPercent = costTWD > 0 ? ((valueTWD - costTWD) / costTWD) * 100 : 0;
 
                 return {
-                    symbol item.symbol,
-                    market item.market,
-                    currentValueTWD Math.round(valueTWD),
-                    pLPercent plPercent.toFixed(2) + %
+                    symbol: item.symbol,
+                    market: item.market,
+                    currentValueTWD: Math.round(valueTWD),
+                    pLPercent: plPercent.toFixed(2) + "%"
                 };
             });
 
@@ -775,46 +775,46 @@ body class=text-gray-800 h-screen flex overflow-hidden
                 請專注於「市場集中度」（美股 vs. 台股）和「損益狀態」。
                 請用繁體中文提供一個三點式的分析報告：
                 1. 報告目前的集中度風險。
-                2. 根據數據，給出一個具體的多元化建議（例如，分散到哪個市場資產類別）。
+                2. 根據數據，給出一個具體的多元化建議（例如，分散到哪個市場/資產類別）。
                 3. 總結投資組合當前的總體風險或最大亮點。
-                請使用 HTML 段落 p 和列表 ulli 格式化您的輸出。
+                請使用 HTML 段落 <p> 和列表 <ul>/<li> 格式化您的輸出。
             `;
 
-            const systemInstruction = 你是一位資深財務分析師，專門為個人投資者提供簡潔、重點明確的投資組合建議。只根據提供的數據進行分析，並嚴格使用繁體中文。;
+            const systemInstruction = "你是一位資深財務分析師，專門為個人投資者提供簡潔、重點明確的投資組合建議。只根據提供的數據進行分析，並嚴格使用繁體中文。";
 
             const result = await callGemini(portfolioPrompt, false, systemInstruction);
 
-             LLM generates formatted HTML content based on the prompt
-            openAnalysisModal(✨ 組合多元化分析, result.text, result.sources);
+            // LLM generates formatted HTML content based on the prompt
+            openAnalysisModal("✨ 組合多元化分析", result.text, result.sources);
         }
 
-         FEATURE 2 Single Stock Analysis (Grounded Search)
+        // FEATURE 2: Single Stock Analysis (Grounded Search)
         async function openStockAnalysisModal(symbol) {
             openAnalysisModal(`✨ ${symbol} 近期分析`, `
-                div class=flex justify-center items-center py-10
-                    div class=w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spindiv
-                    p class=ml-3 text-indigo-600AI 正在搜尋 ${symbol} 的最新資訊...p
-                div
+                <div class="flex justify-center items-center py-10">
+                    <div class="w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spin"></div>
+                    <p class="ml-3 text-indigo-600">AI 正在搜尋 ${symbol} 的最新資訊...</p>
+                </div>
             `);
 
-            const item = APP_STATE.portfolio.find(i = i.symbol === symbol);
+            const item = APP_STATE.portfolio.find(i => i.symbol === symbol);
             if (!item) return;
 
-            const marketText = item.market === '台股'  '台灣股市'  '美國股市';
+            const marketText = item.market === '台股' ? '台灣股市' : '美國股市';
             
             const stockPrompt = `
                 Summarize the latest major news, recent performance, and analyst consensus (if available) for ${marketText} stock symbol ${symbol}. The response must be a single paragraph of about 4-5 sentences, written in Traditional Chinese.
             `;
             
-            const systemInstruction = 你是一位金融新聞摘要員。根據 Google 搜尋結果，為指定股票提供一個公正、簡潔的繁體中文分析段落。嚴禁加入問候語或結語。;
+            const systemInstruction = "你是一位金融新聞摘要員。根據 Google 搜尋結果，為指定股票提供一個公正、簡潔的繁體中文分析段落。嚴禁加入問候語或結語。";
 
             const result = await callGemini(stockPrompt, true, systemInstruction);
 
-             LLM returns raw text, wrap it in p
-            const formattedText = `p class=whitespace-pre-wrap${result.text}p`;
+            // LLM returns raw text, wrap it in <p>
+            const formattedText = `<p class="whitespace-pre-wrap">${result.text}</p>`;
             openAnalysisModal(`✨ ${symbol} 近期分析`, formattedText, result.sources);
         }
 
-    script
-body
-html
+    </script>
+</body>
+</html>
