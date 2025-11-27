@@ -6,6 +6,18 @@
     <title>StockZen | 個人資產管理</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- Firebase Imports for Database and Auth -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, query, where, updateDoc, getDoc, getDocs, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Expose Firebase services globally
+        window.firebase = {
+            initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged,
+            getFirestore, doc, setDoc, onSnapshot, collection, query, where, updateDoc, getDoc, getDocs, deleteDoc, setLogLevel
+        };
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f3ff6; }
@@ -34,26 +46,15 @@
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
-    <!-- Chosen Palette: Slate (Sidebar) + White (Content) + Red/Green (Indicators) -->
-    <!-- Application Structure Plan: Dashboard layout with Sidebar for navigation (desktop) / Bottom summary (mobile). 
-         Central Dashboard shows Net Worth, Day Change (simulated), and Allocation.
-         Holdings section allows CRUD operations. 
-         Data fetching logic uses Google Search Grounding with manual override fallback. 
-         New AI analysis features are integrated into the dashboard (Portfolio Analysis) and the holdings list (Stock Summary) using dedicated modals. -->
-    <!-- Visualization & Content Choices: 
-         - Net Worth Card: Big number, key goal.
-         - Holdings Table: Detailed list with Sparkline-like P&L indicators and new AI analysis trigger.
-         - Allocation Chart: Pie Chart (Chart.js) to show diversification.
-         - Interaction: Modals for adding assets, manual price entry, and AI analysis results. -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <!-- 應用程式結構計畫: 儀表板佈局，核心功能是利用 Firestore 共享報價和 LLM 進行 AI 分析。 -->
 </head>
 <body class="text-gray-800 h-screen flex overflow-hidden">
 
-    <!-- 桌面側邊欄 / 手機置底導航 (簡化為側邊欄模式) -->
+    <!-- 桌面側邊欄 -->
     <aside class="hidden md:flex md:flex-col w-64 bg-slate-900 text-white transition-all duration-300 z-10">
         <div class="p-6 border-b border-slate-800 flex items-center justify-between">
             <h1 class="text-2xl font-bold tracking-tight">StockZen</h1>
-            <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">v1.0</span>
+            <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">v2.3 (無API報價)</span>
         </div>
         <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
             <a href="#" class="flex items-center space-x-3 px-4 py-3 bg-slate-800 rounded-lg text-white shadow-sm">
@@ -65,17 +66,17 @@
                 <span class="text-xl">➕</span>
                 <span class="font-medium">新增持股</span>
             </button>
-             <button onclick="updateData()" class="w-full mt-1 flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left">
-                <span class="text-xl">🔄</span>
-                <span class="font-medium">更新報價</span>
+             <button onclick="showManualUpdateTip()" class="w-full mt-1 flex items-center space-x-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-lg transition-colors text-left">
+                <span class="text-xl">💡</span>
+                <span class="font-medium">價格更新提示</span>
             </button>
         </nav>
         <div class="p-4 border-t border-slate-800">
             <div class="flex items-center space-x-3 px-4 py-2">
                 <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-sm font-bold">U</div>
                 <div>
-                    <p class="text-sm font-medium">User Portfolio</p>
-                    <p class="text-xs text-slate-400">Local Storage</p>
+                    <p class="text-sm font-medium">個人投資組合</p>
+                    <p class="text-xs text-slate-400" id="userIdDisplay">Loading...</p>
                 </div>
             </div>
         </div>
@@ -132,13 +133,13 @@
                 <div class="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 text-white md:col-span-2">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-lg font-bold mb-2">市場快訊</h3>
-                            <p class="text-indigo-100 text-sm mb-4">點擊「更新報價」以獲取 Google 搜尋到的最新價格。</p>
-                            <p class="text-xs text-indigo-200 opacity-80">* 價格可能延遲，請以券商為準。</p>
+                            <h3 class="text-lg font-bold mb-2">市場快訊 (手動模式)</h3>
+                            <p class="text-indigo-100 text-sm mb-4">點擊價格可手動輸入最新報價，並**即時共享**給所有用戶。</p>
+                            <p class="text-xs text-indigo-200 opacity-80">* 本應用程式已移除自動報價功能，以保護您的 API Key。</p>
                         </div>
                         <div class="flex flex-col space-y-2">
-                            <button onclick="updateData()" class="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">
-                                立即更新
+                            <button onclick="showManualUpdateTip()" class="bg-white text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors">
+                                價格更新提示
                             </button>
                             <!-- New LLM Feature 1: Portfolio Analysis -->
                             <button onclick="analyzePortfolio()" class="bg-pink-500 text-white hover:bg-pink-600 px-4 py-2 rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center justify-center space-x-1">
@@ -153,7 +154,7 @@
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden fade-in" style="animation-delay: 0.1s;">
                 <div class="p-6 border-b border-gray-100 flex justify-between items-center">
                     <h3 class="text-lg font-bold text-gray-800">持股明細</h3>
-                    <span class="text-xs text-gray-400">點擊價格可手動修正</span>
+                    <span class="text-xs text-gray-400">點擊價格可手動修正 / 點擊按鈕在彈出視窗查價</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-sm text-left">
@@ -183,6 +184,22 @@
             
             <div class="h-20"></div> <!-- 底部留白 -->
         </main>
+    </div>
+
+    <!-- 模態框: Google 查價 (新增 iFrame 視窗) -->
+    <div id="searchModal" class="fixed inset-0 bg-gray-900/50 hidden items-center justify-center z-50 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl h-5/6 p-6 transform transition-all scale-100 m-4 flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 id="searchModalTitle" class="text-xl font-bold text-gray-800">查詢最新報價</h3>
+                <button onclick="closeSearchModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <p class="text-sm text-gray-500 mb-3">請在下方視窗查看 Google 搜尋結果中的最新價格，然後手動輸入。</p>
+            <!-- iFrame 用於嵌入 Google 搜尋頁面 -->
+            <iframe id="googleSearchIframe" class="flex-1 w-full border border-gray-200 rounded-lg" src="about:blank"></iframe>
+            <div class="flex justify-end mt-4">
+                 <button onclick="closeSearchModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-xl shadow-lg transition-colors">完成並關閉</button>
+            </div>
+        </div>
     </div>
 
     <!-- 模態框: 新增持股 -->
@@ -232,7 +249,7 @@
             <input type="number" id="manualPriceInput" step="any" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 outline-none text-lg font-medium mb-4" placeholder="輸入最新市價">
             <div class="flex justify-end space-x-3">
                 <button onclick="closePriceModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg">取消</button>
-                <button id="savePriceBtn" class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 shadow-md">更新</button>
+                <button id="savePriceBtn" class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 shadow-md">更新 (共享)</button>
             </div>
         </div>
     </div>
@@ -281,24 +298,46 @@
         // ==========================================
         // 核心狀態與數據
         // ==========================================
+        
+        // 🚨🚨🚨 重要：報價功能警告 🚨🚨🚨
+        // 為避免 API Key 洩露與產生費用，自動報價功能已移除。
+        // API Key 僅用於 AI 分析功能 (組合分析、個股分析)。
+        const API_KEY = "";
+        const BASE_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=";
+
         const APP_STATE = {
-            exchangeRate: 32.5, // 預設匯率，可嘗試抓取更新
+            exchangeRate: 32.5, // 預設匯率
             prices: {}, // { "2330": { price: 1000, source: 'API'/'Manual' } }
             portfolio: [],
-            chartInstance: null
+            chartInstance: null,
+            isAuthReady: false,
+            userId: null
         };
-
+        
+        // --- Firebase Globals ---
+        let db, auth;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-stockzen-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // 公共報價的 Firestore 路徑 (共享報價的關鍵)
+        const PUBLIC_PRICES_PATH = `artifacts/${appId}/public/data/stock_prices`;
+        
         // ==========================================
-        // 初始化與生命週期
+        // 初始化與生命週期 (使用 Firestore)
         // ==========================================
         document.addEventListener('DOMContentLoaded', () => {
-            loadData();
-            render();
-            // 延遲自動更新一次數據
-            setTimeout(() => updateData(true), 1000);
+            if (firebaseConfig) {
+                initFirebase();
+            } else {
+                console.error("Firebase configuration is missing. Running in local storage mode.");
+                loadDataFromLocalStorage();
+                render();
+            }
         });
 
-        function loadData() {
+        // 從 Local Storage 載入初始/範例數據 (用於第一次使用或 Firebase 失敗時的後備)
+        function loadDataFromLocalStorage() {
             const saved = localStorage.getItem('stockZen_portfolio');
             if (saved) {
                 APP_STATE.portfolio = JSON.parse(saved);
@@ -309,38 +348,134 @@
                     { symbol: "AAPL", market: "美股", shares: 50, cost: 150 }
                 ];
             }
-            
             const savedPrices = localStorage.getItem('stockZen_prices');
             if (savedPrices) APP_STATE.prices = JSON.parse(savedPrices);
         }
 
-        function saveData() {
-            localStorage.setItem('stockZen_portfolio', JSON.stringify(APP_STATE.portfolio));
-            localStorage.setItem('stockZen_prices', JSON.stringify(APP_STATE.prices));
+        async function initFirebase() {
+            const { initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, getFirestore } = window.firebase;
+            
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // 1. Authenticate
+            if (initialAuthToken) {
+                await signInWithCustomToken(auth, initialAuthToken).catch(e => {
+                    console.error("Custom token sign in failed, signing anonymously.", e);
+                    return signInAnonymously(auth);
+                });
+            } else {
+                await signInAnonymously(auth);
+            }
+            
+            // 2. Set up Auth Listener and Data Subscription
+            onAuthStateChanged(auth, (user) => {
+                APP_STATE.userId = user ? user.uid : crypto.randomUUID();
+                APP_STATE.isAuthReady = true;
+                
+                // 顯示 userId
+                const userDisplayEl = document.getElementById('userIdDisplay');
+                if(userDisplayEl) userDisplayEl.innerText = `ID: ${APP_STATE.userId.substring(0, 8)}...`;
+
+                subscribeToData();
+                showToast("Firebase 連線成功，載入您的投資組合。", "success");
+            });
         }
 
+        function subscribeToData() {
+            if (!db || !APP_STATE.isAuthReady) return;
+            
+            const { onSnapshot, doc } = window.firebase;
+            
+            // --- 訂閱 私人投資組合 ---
+            const portfolioDocRef = doc(db, `artifacts/${appId}/users/${APP_STATE.userId}/portfolio/myPortfolio`);
+            onSnapshot(portfolioDocRef, (docSnapshot) => {
+                if (docSnapshot.exists() && docSnapshot.data().holdings) {
+                    APP_STATE.portfolio = docSnapshot.data().holdings;
+                } else {
+                    // 如果用戶是第一次使用，使用範例數據並儲存
+                    if (APP_STATE.portfolio.length === 0) {
+                         loadDataFromLocalStorage(); // 使用本地範例數據作為初始值
+                         savePortfolioToFirestore();
+                    }
+                }
+                render();
+            }, (error) => {
+                console.error("Error subscribing to portfolio:", error);
+                render(); 
+            });
+            
+            // --- 訂閱 公共報價 (多人共享的關鍵) ---
+            const pricesDocRef = doc(db, PUBLIC_PRICES_PATH, 'current');
+            onSnapshot(pricesDocRef, (docSnapshot) => {
+                if (docSnapshot.exists()) {
+                    // Prices object structure: { "2330": { price: 1000, source: 'API'/'Manual' } }
+                    APP_STATE.prices = docSnapshot.data() || {};
+                } else {
+                    APP_STATE.prices = {};
+                }
+                render();
+            }, (error) => {
+                console.error("Error subscribing to prices:", error);
+                render(); 
+            });
+        }
+        
+        async function savePortfolioToFirestore() {
+            if (!db || !APP_STATE.isAuthReady || APP_STATE.portfolio.length === 0) return;
+            const { doc, setDoc } = window.firebase;
+            
+            const portfolioDocRef = doc(db, `artifacts/${appId}/users/${APP_STATE.userId}/portfolio/myPortfolio`);
+            try {
+                // 將整個投資組合作為一個文件儲存
+                await setDoc(portfolioDocRef, { holdings: APP_STATE.portfolio }, { merge: false });
+            } catch (e) {
+                console.error("Error saving portfolio to Firestore:", e);
+                showToast("儲存投資組合失敗。", "error");
+            }
+        }
+        
+        /**
+         * 🚨 報價功能已移除 🚨
+         * 此函數現在僅用於提示用戶應手動輸入價格。
+         */
+        function showManualUpdateTip() {
+            showToast("已移除自動報價功能。請點擊持股列表中的價格，手動輸入最新報價。該價格會自動共享給所有用戶。", "info", 6000); 
+        }
+
+
         // ==========================================
-        // 通用 API 與 LLM 呼叫工具
+        // 通用 API 與 LLM 呼叫工具 (僅用於 AI 分析)
         // ==========================================
 
-        async function fetchWithBackoff(url, options, maxRetries = 2) {
+        /**
+         * 帶有指數退避機制的 Fetch 函數
+         */
+        async function fetchWithBackoff(url, options, maxRetries = 3) {
             for (let i = 0; i < maxRetries; i++) {
                 try {
                     const response = await fetch(url, options);
-                    if (response.status === 429) {
+                    if (response.status === 429) { // 頻率限制
                         await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
                         continue;
+                    }
+                    if (!response.ok) {
+                        throw new Error(`API response status: ${response.status} ${response.statusText}`);
                     }
                     return await response.json();
                 } catch (e) {
                     if (i === maxRetries - 1) throw e;
+                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
                 }
             }
         }
 
+        /**
+         * 呼叫 Gemini API 進行文本生成或數據查詢 (用於 AI 分析)
+         */
         async function callGemini(prompt, isGrounded = false, systemInstruction = null) {
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const apiUrl = `${BASE_API_URL}${API_KEY}`;
 
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
@@ -383,86 +518,14 @@
 
             } catch (e) {
                 console.error("Gemini API Error:", e);
+                // 檢查是否因為 API Key 缺失而失敗
+                if (API_KEY === "") {
+                     return { text: "API 金鑰缺失：AI 分析需要 Gemini API Key，請檢查程式碼頂部。", sources: [] };
+                }
                 return { text: "連線錯誤，無法取得 AI 分析。", sources: [] };
             }
         }
 
-
-        // ==========================================
-        // 數據獲取 (Google Search Grounding - Price)
-        // ==========================================
-        async function updateData(silent = false) {
-            if (!silent) showToast("正在搜尋最新報價...", "info");
-
-            const apiKey = ""; 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-
-            const targets = APP_STATE.portfolio.filter(item => {
-                const current = APP_STATE.prices[item.symbol];
-                return !current || current.source !== 'Manual';
-            });
-
-            if (targets.length === 0 && !silent) {
-                showToast("所有標的皆為手動鎖定價格", "info");
-                render();
-                return;
-            }
-
-            for (const item of targets) {
-                const marketKeyword = item.market === '台股' ? 'Taiwan Stock' : 'US Stock';
-                const currencyKeyword = item.market === '台股' ? 'TWD' : 'USD';
-
-                const prompt = `Current stock price for ${marketKeyword} ${item.symbol}.`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    tools: [{ "google_search": {} }],
-                    systemInstruction: { 
-                        // **調整系統指令，要求只回傳數字**
-                        parts: [{ text: `You are a price fetcher. Find the latest price for the given stock. Return ONLY the raw number of the price (including decimals if present) in ${currencyKeyword}. Do NOT include currency symbols, descriptive text, or any other characters.` }] 
-                    }
-                };
-
-                try {
-                    const data = await fetchWithBackoff(apiUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    
-                    let price = NaN;
-                    if (text) {
-                        // 1. **(強化)** 移除逗號 (Common issue: 千位分隔符會導致 parseFloat 失敗)
-                        const noCommasText = text.replace(/,/g, '');
-                        
-                        // 2. **(強化)** 尋找第一個標準浮點數模式 (數字.數字 或 數字)
-                        const priceMatch = noCommasText.match(/(\d+\.\d+|\d+)/); 
-
-                        if (priceMatch && priceMatch[0]) {
-                            price = parseFloat(priceMatch[0]);
-                        }
-                    }
-
-                    if (price && !isNaN(price) && price > 0) {
-                        APP_STATE.prices[item.symbol] = { price: price, source: 'API' };
-                    } else {
-                        // 如果無法獲取有效價格，設置為 0，並輸出警告
-                        console.warn(`LLM價格提取失敗: ${item.symbol}. 原始響應: ${text}. 解析出的數字: ${price}`);
-                        APP_STATE.prices[item.symbol] = { price: 0, source: 'API' }; 
-                    }
-                } catch (e) {
-                    console.error(`Error fetching ${item.symbol}`, e);
-                    APP_STATE.prices[item.symbol] = { price: 0, source: 'API' };
-                }
-                await new Promise(r => setTimeout(r, 500)); // 避免 API 頻率過高
-            }
-
-            saveData();
-            render();
-            if (!silent) showToast("報價更新完成", "success");
-        }
 
         // ==========================================
         // 渲染邏輯
@@ -481,6 +544,7 @@
             }
 
             APP_STATE.portfolio.forEach((item, index) => {
+                // 報價數據來自共享的 APP_STATE.prices (由手動輸入觸發)
                 const priceData = APP_STATE.prices[item.symbol] || { price: 0, source: 'None' };
                 const currentPrice = priceData.price;
                 
@@ -509,7 +573,7 @@
                     profitPercent = (profitTWD / costTWD) * 100;
                 } else if (marketValueTWD > 0) {
                     profitTWD = marketValueTWD;
-                    profitPercent = 100; // Infinite P&L is represented as 100% or simply ignored for safety
+                    profitPercent = 100; 
                 }
 
                 totalNetWorth += marketValueTWD;
@@ -527,7 +591,17 @@
                 // 紅漲綠跌樣式
                 const colorClass = profitTWD >= 0 ? 'text-red-500' : 'text-green-600';
                 const sign = profitTWD >= 0 ? '+' : '';
-                const sourceBadge = priceData.source === 'Manual' ? '<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">手動</span>' : '';
+                
+                // 顯示價格來源
+                let sourceBadge = '';
+                if (priceData.source === 'Manual') {
+                    sourceBadge = '<span class="text-[10px] bg-pink-100 text-pink-600 px-1 rounded ml-1">手動/共享</span>';
+                } else if (priceData.source === 'API') {
+                    // 以前的 API 價格標記為舊的共享價格
+                    sourceBadge = '<span class="text-[10px] bg-gray-100 text-gray-600 px-1 rounded ml-1">舊共享價</span>';
+                } else {
+                     sourceBadge = '<span class="text-[10px] bg-red-100 text-red-600 px-1 rounded ml-1">N/A</span>';
+                }
 
                 tr.innerHTML = `
                     <td class="px-6 py-4 font-bold text-gray-800 flex items-center">
@@ -544,6 +618,7 @@
                     <td class="px-6 py-4 text-right ${colorClass} font-medium">${sign}${Math.round(profitTWD).toLocaleString()}</td>
                     <td class="px-6 py-4 text-right ${colorClass} font-medium">${sign}${profitPercent.toFixed(2)}%</td>
                     <td class="px-6 py-4 text-center space-x-2">
+                         <button onclick="openGoogleSearch('${item.symbol}')" class="text-xs text-blue-500 hover:text-blue-700 font-semibold px-2 py-1 rounded-lg bg-blue-50 transition-colors">Google 查價</button>
                         <!-- New LLM Feature 2: Stock Analysis -->
                         <button onclick="openStockAnalysisModal('${item.symbol}')" class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold px-2 py-1 rounded-lg bg-indigo-50 transition-colors">AI 分析</button>
                         <button onclick="deleteAsset('${item.symbol}')" class="text-xs text-red-500 hover:text-red-700 font-semibold px-2 py-1 rounded-lg bg-red-50 transition-colors">刪除</button>
@@ -736,6 +811,32 @@
             document.getElementById('analysisModal').classList.add('hidden');
             document.getElementById('analysisModal').classList.remove('flex');
         }
+        
+        // --- 新增: Google 查價 Modal 控制 ---
+        function openSearchModal(symbol) {
+            const modal = document.getElementById('searchModal');
+            const iframe = document.getElementById('googleSearchIframe');
+            
+            // 構建 Google 搜尋 URL
+            const query = `${symbol} 股價`;
+            const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+            
+            document.getElementById('searchModalTitle').innerText = `查詢 ${symbol} 報價 (Google)`;
+            iframe.src = url; // 設置 iframe 來源
+            
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            showToast("Google 搜尋頁面已載入，請查看價格。", "info", 4000);
+        }
+
+        function closeSearchModal() {
+            const modal = document.getElementById('searchModal');
+            const iframe = document.getElementById('googleSearchIframe');
+            iframe.src = "about:blank"; // 清除 iframe 內容
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        // --- End: Google 查價 Modal 控制 ---
 
 
         // --- 數據操作 ---
@@ -765,10 +866,8 @@
                 showToast(`已新增 ${symbol} 到持股列表`, "success");
             }
 
-            saveData();
+            savePortfolioToFirestore();
             render();
-            // 嘗試獲取新加入資產的價格
-            updateData(true); 
             closeAddModal();
         }
 
@@ -779,36 +878,61 @@
         function confirmDelete(symbol) {
             APP_STATE.portfolio = APP_STATE.portfolio.filter(p => p.symbol !== symbol);
             
-            // 刪除價格快取
-            if (APP_STATE.prices[symbol]) {
-                delete APP_STATE.prices[symbol];
-            }
-
-            saveData();
+            savePortfolioToFirestore();
             render();
             closeDeleteConfirmModal();
             showToast(`已刪除 ${symbol} 的持股紀錄`, "warning");
         }
 
-        function saveManualPrice(symbol) {
+        /**
+         * 處理手動價格輸入，並寫入公共 Firestore 文件以供所有用戶共享。
+         */
+        async function saveManualPrice(symbol) {
+            if (!db || !APP_STATE.isAuthReady) {
+                showToast("資料庫尚未準備好。", "error");
+                return;
+            }
+            
+            const { doc, setDoc } = window.firebase;
             const priceInput = document.getElementById('manualPriceInput');
             const price = parseFloat(priceInput.value);
 
             if (isNaN(price) || price <= 0) {
-                showToast("請輸入有效的價格", "error");
+                showToast("請輸入有效的價格 (必須大於 0)", "error");
                 return;
             }
 
-            APP_STATE.prices[symbol] = { price: price, source: 'Manual' };
-            saveData();
-            render();
-            closePriceModal();
-            showToast(`${symbol} 價格已手動更新`, "success");
+            // 確保不會覆蓋其他股票的共享價格
+            const newPrices = { ...APP_STATE.prices };
+            // 將價格標記為 Manual/共享來源
+            newPrices[symbol] = { price: price, source: 'Manual' };
+            
+            const pricesDocRef = doc(db, PUBLIC_PRICES_PATH, 'current');
+            try {
+                // 透過 setDoc 寫入新的價格數據到公共 Firestore 文件，實現共享
+                await setDoc(pricesDocRef, newPrices);
+                
+                // onSnapshot 會自動更新 APP_STATE.prices 和 UI
+                closePriceModal();
+                showToast(`${symbol} 價格已手動更新並共享給所有用戶。`, "success");
+            } catch (e) {
+                console.error("Error saving manual price to Firestore:", e);
+                showToast("手動更新價格失敗。", "error");
+            }
         }
         
-        // --- AI 分析功能 ---
+        // --- 外部查價操作 (改為 Modal) ---
+        function openGoogleSearch(symbol) {
+            openSearchModal(symbol);
+        }
+        
+        // --- AI 分析功能 (仍需 API Key) ---
 
         async function analyzePortfolio() {
+            if (API_KEY === "") {
+                showToast("AI 分析功能需要 Gemini API Key。", "error");
+                return;
+            }
             openAnalysisModal("投資組合綜合分析");
             
             const portfolioSummary = APP_STATE.portfolio.map(item => {
@@ -845,10 +969,13 @@
         }
 
         async function openStockAnalysisModal(symbol) {
+            if (API_KEY === "") {
+                showToast("AI 分析功能需要 Gemini API Key。", "error");
+                return;
+            }
             openAnalysisModal(`${symbol} 股票分析`);
 
             const item = APP_STATE.portfolio.find(p => p.symbol === symbol);
-            const currentPrice = APP_STATE.prices[symbol]?.price || 'N/A';
             const market = item.market === '台股' ? '台灣股市' : '美國股市';
             
             const prompt = `Provide a brief fundamental and technical analysis summary for the stock ${symbol} traded in the ${market}. Include its current sector, recent news (if any), and a forward-looking outlook. Keep the analysis concise and under 150 words.`;
@@ -867,15 +994,19 @@
             text = text.replace(/^## (.*)$/gm, '<h3>$1</h3>');
             text = text.replace(/^# (.*)$/gm, '<h2>$1</h2>');
             
-            // 將所有換行符轉換為 <br>
-            text = text.replace(/\n/g, '<br>');
+            // 替換 markdown 列表
+            text = text.replace(/^\* (.*)$/gm, '<li>$1</li>');
+            text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
             
             // 替換 markdown 粗體 **X** 或 *X* 為 <strong>X</strong>
             text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
             
-            // 將連續的 <br><br> 轉換為 <p> 標籤或單個換行，避免過多空間
-            text = text.replace(/<br>\s*<br>/g, '<br><br>');
+            // 將所有單個換行符轉換為 <br>
+            text = text.replace(/\n/g, '<br>');
+            
+            // 將連續的 <br><br> 轉換為段落間隔，避免過多空間
+            text = text.replace(/(<br>){3,}/g, '<br><br>');
             
             return text;
         }
@@ -898,7 +1029,7 @@
         }
 
         // --- 訊息提示 ---
-        function showToast(message, type = 'info') {
+        function showToast(message, type = 'info', duration = 3000) {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
             
@@ -919,10 +1050,10 @@
             // 顯示 toast
             toast.classList.remove('translate-x-full');
             
-            // 3秒後隱藏
+            // 隱藏
             setTimeout(() => {
                 toast.classList.add('translate-x-full');
-            }, 3000);
+            }, duration);
         }
 
     </script>
