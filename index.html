@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <!-- Force refresh to fix MIME type issue -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StockZen | 個人資產管理</title>
@@ -410,14 +409,18 @@
             }
 
             for (const item of targets) {
-                const prompt = item.market === '台股' 
-                    ? `Current stock price for Taiwan Stock ${item.symbol}. Return ONLY the numeric price in TWD.` 
-                    : `Current stock price for US Stock ${item.symbol}. Return ONLY the numeric price in USD.`;
+                const marketKeyword = item.market === '台股' ? 'Taiwan Stock' : 'US Stock';
+                const currencyKeyword = item.market === '台股' ? 'TWD' : 'USD';
+
+                const prompt = `Current stock price for ${marketKeyword} ${item.symbol}.`;
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
                     tools: [{ "google_search": {} }],
-                    systemInstruction: { parts: [{ text: "You are a price fetcher. Return only the latest raw number. No currency symbols." }] }
+                    systemInstruction: { 
+                        // **調整系統指令，要求只回傳數字**
+                        parts: [{ text: `You are a price fetcher. Find the latest price for the given stock. Return ONLY the raw number of the price (including decimals if present) in ${currencyKeyword}. Do NOT include currency symbols, descriptive text, or any other characters.` }] 
+                    }
                 };
 
                 try {
@@ -428,17 +431,26 @@
                     });
 
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-                    // Robust extraction of floating point number
+                    
+                    // **加強數字解析：匹配數字和可能的小數點**
                     const priceMatch = text?.match(/[\d\.]+/);
-                    const price = priceMatch ? parseFloat(priceMatch[0]) : NaN;
+                    let price = NaN;
+
+                    if (priceMatch && priceMatch[0]) {
+                        price = parseFloat(priceMatch[0]);
+                    }
 
                     if (price && !isNaN(price) && price > 0) {
                         APP_STATE.prices[item.symbol] = { price: price, source: 'API' };
+                    } else {
+                        console.warn(`Could not extract valid price for ${item.symbol}. Raw response: ${text}`);
+                        // 如果無法獲取有效價格，我們暫時設置為 0，直到手動輸入
+                        // APP_STATE.prices[item.symbol] = { price: 0, source: 'API' }; // 保持 0.00 讓使用者知道 API 失敗
                     }
                 } catch (e) {
                     console.error(`Error fetching ${item.symbol}`, e);
                 }
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 500)); // 避免 API 頻率過高
             }
 
             saveData();
@@ -527,39 +539,58 @@
                     <td class="px-6 py-4 text-right ${colorClass} font-medium">${sign}${profitPercent.toFixed(2)}%</td>
                     <td class="px-6 py-4 text-center space-x-2">
                         <!-- New LLM Feature 2: Stock Analysis -->
-                        <button onclick="openStockAnalysisModal('${item.symbol}')" class="text-xs text-indigo-500 hover:text-indigo-700 transition-colors font-medium p-1">✨ 分析</button>
-                        <button onclick="openDeleteConfirmModal(${index})" class="text-gray-300 hover:text-red-500 transition-colors p-1">🗑️</button>
+                        <button onclick="openStockAnalysisModal('${item.symbol}')" class="text-xs text-indigo-500 hover:text-indigo-700 font-semibold px-2 py-1 rounded-lg bg-indigo-50 transition-colors">AI 分析</button>
+                        <button onclick="deleteAsset('${item.symbol}')" class="text-xs text-red-500 hover:text-red-700 font-semibold px-2 py-1 rounded-lg bg-red-50 transition-colors">刪除</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
 
-            // 更新總覽卡片
-            const totalPL = totalNetWorth - totalCost;
-            const totalPLPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
-            const totalColor = totalPL >= 0 ? 'text-red-500' : 'text-green-600';
-            const totalSign = totalPL >= 0 ? '+' : '';
-
+            // 更新儀表板數據
             document.getElementById('totalNetWorth').innerText = `NT$ ${Math.round(totalNetWorth).toLocaleString()}`;
-            document.getElementById('totalPL').innerText = `NT$ ${Math.round(totalPL).toLocaleString()}`;
-            document.getElementById('totalPL').className = `text-3xl font-bold tracking-tight ${totalColor}`;
             
-            const plBadge = document.getElementById('totalPLPercent');
-            plBadge.innerText = `${totalSign}${totalPLPercent.toFixed(2)}%`;
-            plBadge.className = `inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${totalPL >= 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`;
+            const totalPL = totalNetWorth - totalCost;
+            const totalPLPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : (totalPL > 0 ? 100 : 0);
+            
+            const totalPL_el = document.getElementById('totalPL');
+            const totalPLPercent_el = document.getElementById('totalPLPercent');
 
-            // 繪製/更新圖表
-            renderChart(allocationData);
+            totalPL_el.innerText = `NT$ ${totalPL >= 0 ? '+' : ''}${Math.round(totalPL).toLocaleString()}`;
+            totalPL_el.classList.toggle('text-red-600', totalPL > 0);
+            totalPL_el.classList.toggle('text-green-600', totalPL < 0);
+            totalPL_el.classList.toggle('text-gray-900', totalPL === 0);
+
+            totalPLPercent_el.innerText = `${totalPLPercent >= 0 ? '+' : ''}${totalPLPercent.toFixed(2)}%`;
+            totalPLPercent_el.classList.remove('bg-gray-100', 'bg-red-100', 'bg-green-100');
+            totalPLPercent_el.classList.remove('text-gray-800', 'text-red-600', 'text-green-600');
+
+            if (totalPL > 0) {
+                totalPLPercent_el.classList.add('bg-red-100', 'text-red-600');
+            } else if (totalPL < 0) {
+                totalPLPercent_el.classList.add('bg-green-100', 'text-green-600');
+            } else {
+                totalPLPercent_el.classList.add('bg-gray-100', 'text-gray-800');
+            }
+
+            // 更新圓餅圖
+            updateChart(allocationData);
         }
-
-        function renderChart(data) {
+        
+        function updateChart(data) {
             const ctx = document.getElementById('allocationChart').getContext('2d');
             
             if (APP_STATE.chartInstance) {
                 APP_STATE.chartInstance.destroy();
             }
 
-            if (data.data.length === 0) return;
+            if (data.data.every(d => d === 0)) {
+                // 如果所有市值都是 0，顯示一個代表無數據的圓餅
+                data = {
+                    labels: ['尚無有效市值'],
+                    data: [1],
+                    colors: ['#e5e7eb'] // Light gray
+                };
+            }
 
             APP_STATE.chartInstance = new Chart(ctx, {
                 type: 'doughnut',
@@ -568,39 +599,75 @@
                     datasets: [{
                         data: data.data,
                         backgroundColor: data.colors,
-                        borderWidth: 0,
-                        hoverOffset: 10
+                        hoverOffset: 8,
+                        borderWidth: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    cutout: '70%',
                     plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 10, usePointStyle: true, font: { size: 10 } } },
-                        tooltip: { 
-                            callbacks: { 
-                                label: (ctx) => ` ${ctx.label}: NT$${Math.round(ctx.raw).toLocaleString()}` 
-                            } 
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 15,
+                                boxWidth: 12,
+                                font: {
+                                    family: 'Inter',
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += `NT$ ${Math.round(context.parsed).toLocaleString()}`;
+                                    }
+                                    return label;
+                                }
+                            },
+                            bodyFont: { family: 'Inter' }
                         }
                     }
                 }
             });
         }
-
+        
         // ==========================================
-        // 互動功能
+        // 互動與操作
         // ==========================================
-        function openAddModal() {
-            document.getElementById('addModal').classList.remove('hidden');
-            document.getElementById('addModal').classList.add('flex');
-            updateCurrencyHint();
+        
+        // --- 彈出層/模態框控制 ---
+        function openAddModal(symbol = null) {
+            const modal = document.getElementById('addModal');
+            const form = document.getElementById('assetForm');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex', 'fade-in');
+            
+            form.reset();
+            if (symbol) {
+                const item = APP_STATE.portfolio.find(p => p.symbol === symbol);
+                if (item) {
+                    document.getElementById('inputSymbol').value = item.symbol;
+                    document.getElementById('inputMarket').value = item.market;
+                    document.getElementById('inputShares').value = item.shares;
+                    document.getElementById('inputCost').value = item.cost;
+                    updateCurrencyHint();
+                    document.getElementById('inputSymbol').disabled = true; // 編輯時不可改代號
+                }
+            } else {
+                document.getElementById('inputSymbol').disabled = false;
+            }
         }
 
         function closeAddModal() {
-            document.getElementById('addModal').classList.add('hidden');
-            document.getElementById('addModal').classList.remove('flex');
-            document.getElementById('assetForm').reset();
+            const modal = document.getElementById('addModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex', 'fade-in');
         }
 
         function updateCurrencyHint() {
@@ -608,133 +675,55 @@
             document.getElementById('currencyHint').innerText = market === '台股' ? 'TWD' : 'USD';
         }
 
-        function handleAssetSubmit(e) {
-            e.preventDefault();
-            const symbol = document.getElementById('inputSymbol').value.toUpperCase();
-            const market = document.getElementById('inputMarket').value;
-            const shares = parseFloat(document.getElementById('inputShares').value);
-            const cost = parseFloat(document.getElementById('inputCost').value);
-
-            const newItem = { symbol, market, shares, cost };
-            
-            // 簡單檢查是否已存在，若存在則覆蓋 (簡單邏輯)
-            const idx = APP_STATE.portfolio.findIndex(i => i.symbol === symbol);
-            if (idx >= 0) {
-                APP_STATE.portfolio[idx] = newItem;
-                showToast(`已更新 ${symbol}`, "success");
-            } else {
-                APP_STATE.portfolio.push(newItem);
-                showToast(`已新增 ${symbol}`, "success");
-            }
-
-            saveData();
-            render();
-            closeAddModal();
-            updateData(true); // 嘗試抓取新股票價格
-        }
-        
-        // 刪除持股的執行函數 (取代舊的 deleteAsset)
-        function executeDeleteAsset(index) {
-            const removed = APP_STATE.portfolio.splice(index, 1);
-            delete APP_STATE.prices[removed[0].symbol];
-            saveData();
-            render();
-            showToast("已刪除持股", "info");
-            closeDeleteConfirmModal();
-        }
-
-        // 刪除持股的確認模態框
-        let assetIndexToDelete = null;
-
-        function openDeleteConfirmModal(index) {
-            assetIndexToDelete = index;
-            const symbol = APP_STATE.portfolio[index].symbol;
-            document.getElementById('deleteModalMessage').innerHTML = `確定要刪除 <span class="font-bold text-red-600">${symbol}</span> 的持股紀錄嗎？此操作無法復原。`;
-            
-            document.getElementById('deleteConfirmModal').classList.remove('hidden');
-            document.getElementById('deleteConfirmModal').classList.add('flex');
-
-            document.getElementById('confirmDeleteBtn').onclick = () => {
-                executeDeleteAsset(assetIndexToDelete);
-            };
-        }
-
-        function closeDeleteConfirmModal() {
-            document.getElementById('deleteConfirmModal').classList.add('hidden');
-            document.getElementById('deleteConfirmModal').classList.remove('flex');
-            assetIndexToDelete = null;
-        }
-
-        // 手動價格修正
-        let currentEditingSymbol = null;
-
         function openPriceModal(symbol) {
-            currentEditingSymbol = symbol;
-            document.getElementById('priceModalSymbol').innerText = `正在修正 ${symbol} 的價格`;
-            const current = APP_STATE.prices[symbol]?.price || '';
-            document.getElementById('manualPriceInput').value = current;
+            const item = APP_STATE.portfolio.find(p => p.symbol === symbol);
+            if (!item) return;
+
+            const priceModal = document.getElementById('priceModal');
+            document.getElementById('priceModalSymbol').innerText = `為 ${item.symbol} (${item.market}) 設定手動價格：`;
             
-            document.getElementById('priceModal').classList.remove('hidden');
-            document.getElementById('priceModal').classList.add('flex');
+            const currentPrice = APP_STATE.prices[symbol]?.price || 0;
+            document.getElementById('manualPriceInput').value = currentPrice > 0 ? currentPrice : '';
+
+            const saveBtn = document.getElementById('savePriceBtn');
+            saveBtn.onclick = () => saveManualPrice(symbol);
             
-            // 綁定更新按鈕
-            document.getElementById('savePriceBtn').onclick = () => {
-                const newPrice = parseFloat(document.getElementById('manualPriceInput').value);
-                if (newPrice > 0) {
-                    APP_STATE.prices[currentEditingSymbol] = { price: newPrice, source: 'Manual' };
-                    saveData();
-                    render();
-                    closePriceModal();
-                    showToast("價格已鎖定", "success");
-                }
-            };
+            priceModal.classList.remove('hidden');
+            priceModal.classList.add('flex');
+            document.getElementById('manualPriceInput').focus();
         }
 
         function closePriceModal() {
             document.getElementById('priceModal').classList.add('hidden');
             document.getElementById('priceModal').classList.remove('flex');
-            currentEditingSymbol = null;
         }
 
-        // Toast
-        function showToast(msg, type = 'info') {
-            const toast = document.getElementById('toast');
-            toast.classList.remove('translate-x-full');
-            
-            const colors = { success: 'bg-green-600', info: 'bg-gray-800', error: 'bg-red-600' };
-            toast.className = `fixed top-5 right-5 text-white px-6 py-3 rounded-lg shadow-xl transform transition-transform duration-300 z-50 flex items-center ${colors[type] || colors.info}`;
-            document.getElementById('toastMsg').innerText = msg;
-
-            setTimeout(() => {
-                toast.classList.add('translate-x-full');
-            }, 3000);
+        function openDeleteConfirmModal(symbol) {
+            const modal = document.getElementById('deleteConfirmModal');
+            document.getElementById('deleteModalMessage').innerText = `確定要刪除代號 ${symbol} 的持股紀錄嗎？此操作無法復原。`;
+            const confirmBtn = document.getElementById('confirmDeleteBtn');
+            confirmBtn.onclick = () => confirmDelete(symbol);
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
 
-        // ==========================================
-        // Gemini LLM 分析功能
-        // ==========================================
+        function closeDeleteConfirmModal() {
+            document.getElementById('deleteConfirmModal').classList.add('hidden');
+            document.getElementById('deleteConfirmModal').classList.remove('flex');
+        }
 
-        function openAnalysisModal(title, content, sources = []) {
+        function openAnalysisModal(title) {
+            const modal = document.getElementById('analysisModal');
             document.getElementById('analysisModalTitle').innerText = title;
-            document.getElementById('analysisModalContent').innerHTML = content;
-            
-            const sourceContainer = document.getElementById('analysisModalSources');
-            const sourceList = document.getElementById('sourceList');
-            sourceList.innerHTML = '';
-
-            if (sources.length > 0) {
-                sourceContainer.classList.remove('hidden');
-                sources.forEach(s => {
-                    const li = document.createElement('li');
-                    li.innerHTML = `<a href="${s.uri}" target="_blank" class="text-indigo-500 hover:underline">${s.title}</a>`;
-                    sourceList.appendChild(li);
-                });
-            } else {
-                 sourceContainer.classList.add('hidden');
-            }
-
-            document.getElementById('analysisModal').classList.remove('hidden');
-            document.getElementById('analysisModal').classList.add('flex');
+            document.getElementById('analysisModalContent').innerHTML = `
+                <div class="flex justify-center items-center py-10">
+                    <div class="w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spin"></div>
+                    <p class="ml-3 text-indigo-600">AI 正在努力分析中...</p>
+                </div>
+            `;
+            document.getElementById('analysisModalSources').classList.add('hidden');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
 
         function closeAnalysisModal() {
@@ -742,81 +731,194 @@
             document.getElementById('analysisModal').classList.remove('flex');
         }
 
-        // FEATURE 1: Portfolio Diversification Analysis
-        async function analyzePortfolio() {
-            openAnalysisModal("✨ 組合多元化分析", `
-                <div class="flex justify-center items-center py-10">
-                    <div class="w-6 h-6 border-4 border-pink-400 border-t-transparent border-solid rounded-full animate-spin"></div>
-                    <p class="ml-3 text-pink-600">AI 正在評估您的投資組合結構...</p>
-                </div>
-            `);
 
-            if (APP_STATE.portfolio.length === 0) {
-                openAnalysisModal("✨ 組合多元化分析", "<p>請先新增持股，AI 才能為您分析組合結構。</p>");
+        // --- 數據操作 ---
+        function handleAssetSubmit(event) {
+            event.preventDefault();
+            const symbol = document.getElementById('inputSymbol').value.toUpperCase().trim();
+            const market = document.getElementById('inputMarket').value;
+            const shares = parseFloat(document.getElementById('inputShares').value);
+            const cost = parseFloat(document.getElementById('inputCost').value);
+
+            if (!symbol || isNaN(shares) || isNaN(cost) || shares <= 0 || cost < 0) {
+                showToast("請輸入有效的代號、股數和成本", "error");
                 return;
             }
 
-            // Prepare structured portfolio data for the LLM
-            const structuredPortfolio = APP_STATE.portfolio.map(item => {
-                const price = APP_STATE.prices[item.symbol]?.price || 0;
-                const valueTWD = item.market === '美股' ? price * item.shares * APP_STATE.exchangeRate : price * item.shares;
-                const costTWD = item.market === '美股' ? item.cost * item.shares * APP_STATE.exchangeRate : item.cost * item.shares;
-                const plPercent = costTWD > 0 ? ((valueTWD - costTWD) / costTWD) * 100 : 0;
+            const existingIndex = APP_STATE.portfolio.findIndex(p => p.symbol === symbol);
 
-                return {
-                    symbol: item.symbol,
-                    market: item.market,
-                    currentValueTWD: Math.round(valueTWD),
-                    pLPercent: plPercent.toFixed(2) + "%"
-                };
-            });
+            const newAsset = { symbol, market, shares, cost };
 
-            const portfolioPrompt = `
-                分析以下投資組合數據（已換算為 TWD）：${JSON.stringify(structuredPortfolio, null, 2)}。
-                請專注於「市場集中度」（美股 vs. 台股）和「損益狀態」。
-                請用繁體中文提供一個三點式的分析報告：
-                1. 報告目前的集中度風險。
-                2. 根據數據，給出一個具體的多元化建議（例如，分散到哪個市場/資產類別）。
-                3. 總結投資組合當前的總體風險或最大亮點。
-                請使用 HTML 段落 <p> 和列表 <ul>/<li> 格式化您的輸出。
-            `;
+            if (existingIndex !== -1) {
+                // 編輯現有資產
+                APP_STATE.portfolio[existingIndex] = newAsset;
+                showToast(`已更新 ${symbol} 的持股`, "success");
+            } else {
+                // 新增資產
+                APP_STATE.portfolio.push(newAsset);
+                showToast(`已新增 ${symbol} 到持股列表`, "success");
+            }
 
-            const systemInstruction = "你是一位資深財務分析師，專門為個人投資者提供簡潔、重點明確的投資組合建議。只根據提供的數據進行分析，並嚴格使用繁體中文。";
-
-            const result = await callGemini(portfolioPrompt, false, systemInstruction);
-
-            // LLM generates formatted HTML content based on the prompt
-            openAnalysisModal("✨ 組合多元化分析", result.text, result.sources);
+            saveData();
+            render();
+            // 嘗試獲取新加入資產的價格
+            updateData(true); 
+            closeAddModal();
         }
 
-        // FEATURE 2: Single Stock Analysis (Grounded Search)
-        async function openStockAnalysisModal(symbol) {
-            openAnalysisModal(`✨ ${symbol} 近期分析`, `
-                <div class="flex justify-center items-center py-10">
-                    <div class="w-6 h-6 border-4 border-indigo-400 border-t-transparent border-solid rounded-full animate-spin"></div>
-                    <p class="ml-3 text-indigo-600">AI 正在搜尋 ${symbol} 的最新資訊...</p>
-                </div>
-            `);
+        function deleteAsset(symbol) {
+            openDeleteConfirmModal(symbol);
+        }
 
-            const item = APP_STATE.portfolio.find(i => i.symbol === symbol);
-            if (!item) return;
-
-            const marketText = item.market === '台股' ? '台灣股市' : '美國股市';
+        function confirmDelete(symbol) {
+            APP_STATE.portfolio = APP_STATE.portfolio.filter(p => p.symbol !== symbol);
             
-            const stockPrompt = `
-                Summarize the latest major news, recent performance, and analyst consensus (if available) for ${marketText} stock symbol ${symbol}. The response must be a single paragraph of about 4-5 sentences, written in Traditional Chinese.
+            // 刪除價格快取
+            if (APP_STATE.prices[symbol]) {
+                delete APP_STATE.prices[symbol];
+            }
+
+            saveData();
+            render();
+            closeDeleteConfirmModal();
+            showToast(`已刪除 ${symbol} 的持股紀錄`, "warning");
+        }
+
+        function saveManualPrice(symbol) {
+            const priceInput = document.getElementById('manualPriceInput');
+            const price = parseFloat(priceInput.value);
+
+            if (isNaN(price) || price <= 0) {
+                showToast("請輸入有效的價格", "error");
+                return;
+            }
+
+            APP_STATE.prices[symbol] = { price: price, source: 'Manual' };
+            saveData();
+            render();
+            closePriceModal();
+            showToast(`${symbol} 價格已手動更新`, "success");
+        }
+        
+        // --- AI 分析功能 ---
+
+        async function analyzePortfolio() {
+            openAnalysisModal("投資組合綜合分析");
+            
+            const portfolioSummary = APP_STATE.portfolio.map(item => {
+                const currentPrice = APP_STATE.prices[item.symbol]?.price || 'N/A';
+                const marketValue = currentPrice !== 'N/A' 
+                    ? (item.market === '美股' 
+                        ? (currentPrice * item.shares * APP_STATE.exchangeRate) 
+                        : (currentPrice * item.shares)
+                    ).toFixed(0) : 'N/A';
+                
+                return `代號: ${item.symbol}, 市場: ${item.market}, 股數: ${item.shares}, 成本: ${item.cost}, 現價: ${currentPrice}, 市值(TWD): ${marketValue}`;
+            }).join('\n');
+
+            const totalNetWorth = APP_STATE.portfolio.reduce((sum, item) => {
+                const price = APP_STATE.prices[item.symbol]?.price || 0;
+                const value = item.market === '美股' ? price * item.shares * APP_STATE.exchangeRate : price * item.shares;
+                return sum + value;
+            }, 0);
+            
+            const prompt = `Based on the following portfolio data, provide a professional, concise analysis focusing on diversification, risk, and potential next steps. Use traditional Chinese and keep the response under 200 words.
+            
+            Total Net Worth (TWD): ${Math.round(totalNetWorth).toLocaleString()}
+            Portfolio Details:\n${portfolioSummary}
+            
+            Current Exchange Rate (USD/TWD): ${APP_STATE.exchangeRate}
             `;
+
+            const systemInstruction = "您是一位經驗豐富的金融分析師。請根據提供的數據，用簡潔的繁體中文提供專業的投資組合分析報告，側重於風險與建議。請分段落呈現，並使用 Markdown 格式。";
+
+            const result = await callGemini(prompt, true, systemInstruction);
             
-            const systemInstruction = "你是一位金融新聞摘要員。根據 Google 搜尋結果，為指定股票提供一個公正、簡潔的繁體中文分析段落。嚴禁加入問候語或結語。";
+            document.getElementById('analysisModalContent').innerHTML = formatLLMResponse(result.text);
+            updateAnalysisModalSources(result.sources);
+        }
 
-            const result = await callGemini(stockPrompt, true, systemInstruction);
+        async function openStockAnalysisModal(symbol) {
+            openAnalysisModal(`${symbol} 股票分析`);
 
-            // LLM returns raw text, wrap it in <p>
-            const formattedText = `<p class="whitespace-pre-wrap">${result.text}</p>`;
-            openAnalysisModal(`✨ ${symbol} 近期分析`, formattedText, result.sources);
+            const item = APP_STATE.portfolio.find(p => p.symbol === symbol);
+            const currentPrice = APP_STATE.prices[symbol]?.price || 'N/A';
+            const market = item.market === '台股' ? '台灣股市' : '美國股市';
+            
+            const prompt = `Provide a brief fundamental and technical analysis summary for the stock ${symbol} traded in the ${market}. Include its current sector, recent news (if any), and a forward-looking outlook. Keep the analysis concise and under 150 words.`;
+            
+            const systemInstruction = "您是一位資深市場研究員。請根據最新的市場數據，用簡潔的繁體中文，針對指定股票提供基本面和技術面的摘要分析。請分段落呈現，並使用 Markdown 格式。";
+
+            const result = await callGemini(prompt, true, systemInstruction);
+            
+            document.getElementById('analysisModalContent').innerHTML = formatLLMResponse(result.text);
+            updateAnalysisModalSources(result.sources);
+        }
+        
+        function formatLLMResponse(text) {
+             // 替換 markdown 標題為 HTML 標題
+            text = text.replace(/^### (.*)$/gm, '<h4>$1</h4>');
+            text = text.replace(/^## (.*)$/gm, '<h3>$1</h3>');
+            text = text.replace(/^# (.*)$/gm, '<h2>$1</h2>');
+            
+            // 將所有換行符轉換為 <br>
+            text = text.replace(/\n/g, '<br>');
+            
+            // 替換 markdown 粗體 **X** 或 *X* 為 <strong>X</strong>
+            text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            text = text.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // 將連續的 <br><br> 轉換為 <p> 標籤或單個換行，避免過多空間
+            text = text.replace(/<br>\s*<br>/g, '<br><br>');
+            
+            return text;
+        }
+
+        function updateAnalysisModalSources(sources) {
+            const sourcesContainer = document.getElementById('analysisModalSources');
+            const sourceList = document.getElementById('sourceList');
+            sourceList.innerHTML = '';
+            
+            if (sources && sources.length > 0) {
+                sourcesContainer.classList.remove('hidden');
+                sources.slice(0, 3).forEach(source => { // 只顯示前 3 個來源
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="${source.uri}" target="_blank" class="text-indigo-500 hover:text-indigo-600 truncate block">${source.title}</a>`;
+                    sourceList.appendChild(li);
+                });
+            } else {
+                 sourcesContainer.classList.add('hidden');
+            }
+        }
+
+        // --- 訊息提示 ---
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            
+            toastMsg.innerText = message;
+            
+            // 清除舊的顏色類別
+            toast.classList.remove('bg-gray-800', 'bg-red-600', 'bg-green-600');
+            
+            // 設置新的顏色
+            if (type === 'success') {
+                toast.classList.add('bg-green-600');
+            } else if (type === 'error' || type === 'warning') {
+                toast.classList.add('bg-red-600');
+            } else {
+                toast.classList.add('bg-gray-800');
+            }
+
+            // 顯示 toast
+            toast.classList.remove('translate-x-full');
+            
+            // 3秒後隱藏
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 3000);
         }
 
     </script>
 </body>
 </html>
-
