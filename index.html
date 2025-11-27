@@ -432,23 +432,29 @@
 
                     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                     
-                    // **加強數字解析：匹配數字和可能的小數點**
-                    const priceMatch = text?.match(/[\d\.]+/);
                     let price = NaN;
+                    if (text) {
+                        // 1. **(強化)** 移除逗號 (Common issue: 千位分隔符會導致 parseFloat 失敗)
+                        const noCommasText = text.replace(/,/g, '');
+                        
+                        // 2. **(強化)** 尋找第一個標準浮點數模式 (數字.數字 或 數字)
+                        const priceMatch = noCommasText.match(/(\d+\.\d+|\d+)/); 
 
-                    if (priceMatch && priceMatch[0]) {
-                        price = parseFloat(priceMatch[0]);
+                        if (priceMatch && priceMatch[0]) {
+                            price = parseFloat(priceMatch[0]);
+                        }
                     }
 
                     if (price && !isNaN(price) && price > 0) {
                         APP_STATE.prices[item.symbol] = { price: price, source: 'API' };
                     } else {
-                        console.warn(`Could not extract valid price for ${item.symbol}. Raw response: ${text}`);
-                        // 如果無法獲取有效價格，我們暫時設置為 0，直到手動輸入
-                        // APP_STATE.prices[item.symbol] = { price: 0, source: 'API' }; // 保持 0.00 讓使用者知道 API 失敗
+                        // 如果無法獲取有效價格，設置為 0，並輸出警告
+                        console.warn(`LLM價格提取失敗: ${item.symbol}. 原始響應: ${text}. 解析出的數字: ${price}`);
+                        APP_STATE.prices[item.symbol] = { price: 0, source: 'API' }; 
                     }
                 } catch (e) {
                     console.error(`Error fetching ${item.symbol}`, e);
+                    APP_STATE.prices[item.symbol] = { price: 0, source: 'API' };
                 }
                 await new Promise(r => setTimeout(r, 500)); // 避免 API 頻率過高
             }
@@ -489,12 +495,12 @@
                 if (item.market === '美股') {
                     marketValueTWD = currentPrice * item.shares * APP_STATE.exchangeRate;
                     costTWD = item.cost * item.shares * APP_STATE.exchangeRate;
-                    displayPrice = `US$ ${currentPrice.toFixed(2)}`;
+                    displayPrice = currentPrice === 0 ? 'N/A' : `US$ ${currentPrice.toFixed(2)}`;
                     displayCost = `US$ ${item.cost.toFixed(2)}`;
                 } else {
                     marketValueTWD = currentPrice * item.shares;
                     costTWD = item.cost * item.shares;
-                    displayPrice = `NT$ ${currentPrice.toFixed(2)}`;
+                    displayPrice = currentPrice === 0 ? 'N/A' : `NT$ ${currentPrice.toFixed(2)}`;
                     displayCost = `NT$ ${item.cost.toFixed(2)}`;
                 }
 
